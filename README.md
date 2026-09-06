@@ -33,6 +33,9 @@ easy to miss in a network tab with a hundred other requests in it. This library 
 npm install --save-dev why-did-you-fetch
 ```
 
+Requires Node.js ≥22 to install and build this package (that's about the toolchain, not about
+where the published code can run — see [Compatibility](#compatibility) for that).
+
 ## Quick start
 
 Call `init()` once, as early as possible in your app (entry point, root layout, etc.):
@@ -44,8 +47,9 @@ init();
 ```
 
 By default it's a no-op when `process.env.NODE_ENV === 'production'`, so it's safe to leave the
-call in unconditionally. It patches both `fetch` and `XMLHttpRequest` (covering `axios` and most
-other HTTP clients, which sit on top of one or the other), and reports issues to the console.
+call in unconditionally. It patches both `fetch` and `XMLHttpRequest`, and reports issues to the
+console. That covers `axios` and most other HTTP clients **in the browser**, where they sit on
+top of XHR (or fetch) — see [Compatibility](#compatibility) for the Node.js caveat.
 
 Call the function `init()` returns to restore the originals (useful in tests, or with HMR):
 
@@ -81,6 +85,36 @@ function App() {
 
 Each issue is delivered with the call stack(s) involved, so you can jump straight to the
 offending code — the default console reporter prints them as a collapsed, color-coded group.
+
+## Compatibility
+
+`init()` patches whatever exists on the target object (`globalThis` by default). Where either
+API is missing, that half of the patch is silently skipped — calling `init()` is always safe, it
+just won't catch anything in an environment with neither.
+
+| Environment | `fetch` | `XMLHttpRequest` |
+| --- | --- | --- |
+| Any browser (React, Vue, Svelte, Angular, vanilla) | ✅ | ✅ |
+| React Native | ✅ | ✅ |
+| Electron — renderer process | ✅ | ✅ |
+| Electron — main process | ✅ (Node ≥18) | ❌ |
+| Dedicated Web Worker | ✅ | ✅ |
+| Service Worker | ✅ | ❌ |
+| Node.js ≥18 | ✅ (native, via `undici`) | ❌ (never implemented) |
+| Node.js <18 | ❌ (unless polyfilled) | ❌ |
+| Deno | ✅ | ❌ |
+| Bun | ✅ | ❌ |
+
+A couple of specifics worth calling out:
+
+- **Node.js has no `XMLHttpRequest`, ever** — it's a browser/DOM API. On a Node server, only the
+  `fetch` half of `init()` does anything.
+- **`axios` on the server bypasses both.** Its default Node.js adapter (`'http'`) talks to
+  `node:http`/`node:https` directly; the browser default (`'xhr'`) sits on top of the API this
+  library patches. So `axios` calls are caught in the browser, not in a Node backend — same story
+  for most other Node-native HTTP clients (`got`, `superagent`, etc.).
+- **Service Workers get `fetch` but not `XMLHttpRequest`** — it's excluded from
+  `ServiceWorkerGlobalScope` by spec, unlike regular (dedicated) Web Workers, which do have it.
 
 ## Configuration
 
@@ -123,8 +157,6 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 - **Request bodies from a `Request` object** (as opposed to `init.body`) aren't fingerprinted,
   since reading them would mean consuming the stream before the real `fetch` gets to it — those
   calls are still tracked and matched by method + URL alone.
-- Works in any framework, and in React Native's JS environment, since it only touches
-  `fetch`/`XMLHttpRequest`.
 
 ## Example
 
