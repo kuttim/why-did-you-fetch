@@ -128,10 +128,9 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 
 ## Example
 
-- **[Live demo](https://kuttim.github.io/why-did-you-fetch/)** — no install, runs in your browser
-  ([source](./docs/index.html)).
-- [`examples/vanilla-demo`](./examples/vanilla-demo) — build the package locally
-  (`npm run build`), then open `index.html` and click around with the console open.
+**[Live demo](https://kuttim.github.io/why-did-you-fetch/)** — no install required, runs in your
+browser against a mock network layer, with sample-project code for each detected pattern
+([source](./docs/index.html)).
 
 ## Contributing
 
