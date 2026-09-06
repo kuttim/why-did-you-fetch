@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>why-did-you-fetch demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 640px;
+        margin: 3rem auto;
+        line-height: 1.5;
+      }
+      button {
+        display: block;
+        margin: 0.5rem 0;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+      }
+      code {
+        background: #eee;
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>why-did-you-fetch demo</h1>
+    <p>Open the browser console, then click a button below. Run <code>npm run build</code> in the package root first.</p>
+    <button id="duplicate">Fire a duplicate in-flight request</button>
+    <button id="recent">Fire the same request twice, back to back</button>
+    <button id="chain">Fire an accidental sequential chain</button>
+
+    <script type="module">
+      import { init } from '../../dist/index.js';
+
+      init(); // logs to the console by default
+
+      const url = (id) => `https://jsonplaceholder.typicode.com/todos/${id}`;
+
+      document.getElementById('duplicate').addEventListener('click', () => {
+        // Same request, fired twice before either resolves.
+        fetch(url(1));
+        fetch(url(1));
+      });
+
+      document.getElementById('recent').addEventListener('click', async () => {
+        await fetch(url(1));
+        await fetch(url(1)); // identical call, right after the first settled
+      });
+
+      document.getElementById('chain').addEventListener('click', async () => {
+        // Three independent lookups that don't depend on each other's results,
+        // but were written with await instead of Promise.all.
+        await fetch(url(1));
+        await fetch(url(2));
+        await fetch(url(3));
+      });
+    </script>
+  </body>
+</html>

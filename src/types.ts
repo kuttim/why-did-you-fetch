@@ -1,0 +1,104 @@
+export type RequestKind = 'fetch' | 'xhr';
+
+export type RequestStatus = 'pending' | 'resolved' | 'rejected';
+
+/** A single network call we've observed, from the moment it was issued. */
+export interface TrackedRequest {
+  /** Monotonically increasing id, unique per page load. */
+  id: number;
+  /** Which API was used to make the call. */
+  kind: RequestKind;
+  method: string;
+  url: string;
+  /** Identity used for duplicate matching: method + normalized url + body hash. */
+  signature: string;
+  /** performance.now() timestamp when the call was issued. */
+  startedAt: number;
+  /** performance.now() timestamp when it settled, or null while pending. */
+  settledAt: number | null;
+  status: RequestStatus;
+  /** Captured call stack (with our own internal frames stripped), for locating the call site. */
+  stack: string;
+  /** Internal: chain id assigned by the sequential-chain detector. */
+  chainId?: number;
+}
+
+interface IssueBase {
+  /** Human-readable one-liner, ready to log. */
+  message: string;
+}
+
+export interface DuplicateInflightIssue extends IssueBase {
+  kind: 'duplicate-inflight';
+  method: string;
+  url: string;
+  /** The request that was already in flight. */
+  first: TrackedRequest;
+  /** The new, redundant request. */
+  second: TrackedRequest;
+}
+
+export interface DuplicateRecentIssue extends IssueBase {
+  kind: 'duplicate-recent';
+  method: string;
+  url: string;
+  /** The earlier request, already settled. */
+  previous: TrackedRequest;
+  /** The new request that repeated it. */
+  current: TrackedRequest;
+  gapMs: number;
+}
+
+export interface SequentialChainIssue extends IssueBase {
+  kind: 'sequential-chain';
+  /** The requests that make up the chain, in order. */
+  requests: TrackedRequest[];
+  /** Total wall-clock time spent serialized, start of first to end of last. */
+  totalGapMs: number;
+}
+
+export type Issue = DuplicateInflightIssue | DuplicateRecentIssue | SequentialChainIssue;
+
+export type IgnoreMatcher = string | RegExp | ((url: string, method: string) => boolean);
+
+export interface WdyfOptions {
+  /**
+   * Turn the whole thing on/off. Defaults to `true` unless `process.env.NODE_ENV === 'production'`
+   * (when that variable is readable), so it's safe to call `init()` unconditionally and let it
+   * no-op in production builds.
+   */
+  enabled?: boolean;
+  /** Which network APIs to patch. Defaults to both. */
+  patch?: Array<'fetch' | 'xhr'>;
+  /**
+   * If an identical request (method + url + body) completes and then fires again within this
+   * many milliseconds, it's flagged as a probably-avoidable duplicate. Default: 2000.
+   */
+  dedupeWindowMs?: number;
+  /**
+   * Maximum gap (ms) between one request settling and the next starting for them to be
+   * considered part of the same "back-to-back" chain. Default: 10.
+   */
+  chainGapMs?: number;
+  /**
+   * How many requests must chain back-to-back before it's reported as a likely waterfall.
+   * Default: 3.
+   */
+  chainMinLength?: number;
+  /** URLs matching any of these are never tracked or reported. */
+  ignore?: IgnoreMatcher[];
+  /**
+   * Rewrite a URL before it's used for duplicate matching — e.g. to strip cache-busting
+   * query params. Does not affect the actual request or the URL shown in reports.
+   */
+  normalizeUrl?: (url: string) => string;
+  /**
+   * Called with every detected issue. Defaults to a console reporter. Provide your own to
+   * ship issues elsewhere (e.g. an on-page overlay, or your analytics).
+   */
+  onIssue?: (issue: Issue) => void;
+  /** How long settled requests are kept around for dedupe/chain comparisons. Default: 5000. */
+  retainMs?: number;
+}
+
+export type ResolvedWdyfOptions = Required<WdyfOptions>;
