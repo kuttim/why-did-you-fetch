@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-09-06
+
+### Changed
+
+- Add verified compatibility table, fix engines and CI matrix
+
 ## [0.2.1] - 2026-09-06
 
 ### Added
