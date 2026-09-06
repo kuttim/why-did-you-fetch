@@ -51,6 +51,22 @@ const uninstall = init();
 uninstall();
 ```
 
+### React
+
+A thin convenience hook is available at `why-did-you-fetch/react` — it calls `init()` on mount
+and the returned `uninstall()` on unmount, so you don't have to manage that yourself:
+
+```tsx
+import { useWhyDidYouFetch } from 'why-did-you-fetch/react';
+
+function App() {
+  useWhyDidYouFetch(); // same options as init(); read once, at mount time
+  return <YourApp />;
+}
+```
+
+`react` is an optional peer dependency — only needed if you import this entry point.
+
 ## What it detects
 
 | Detector | Fires when | Confidence |

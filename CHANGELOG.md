@@ -11,3 +11,5 @@ All notable changes to this project are documented here. Format loosely follows
 - Three detectors: `duplicate-inflight`, `duplicate-recent`, `sequential-chain`.
 - Configurable dedupe window, chain gap/length, ignore list, URL normalization, and a
   pluggable `onIssue` reporter (defaults to a colored console reporter).
+- `why-did-you-fetch/react` entry point with a `useWhyDidYouFetch()` hook (`react` is an
+  optional peer dependency).
