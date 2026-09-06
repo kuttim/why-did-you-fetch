@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-09-06
+
+### Added
+
+- Add one-command release script
+
 ## [0.2.0] - 2026-09-06
 
 ### Added
