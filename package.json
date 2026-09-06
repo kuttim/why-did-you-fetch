@@ -55,7 +55,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
