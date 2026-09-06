@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-/**
- * One-command release.
- *
- * Bumps the version, drafts a CHANGELOG.md entry from the commits since the last tag (grouped
- * into Keep a Changelog sections, same format as the rest of the file), pauses so you can review
- * or hand-edit that entry, then commits, tags, pushes, cuts a GitHub release (reusing the exact
- * same changelog text as the release notes), and publishes to npm.
- *
- * Usage:
- *   npm run release -- patch|minor|major     bump from the current version
- *   npm run release -- 1.2.3                 or set an explicit version
- *   npm run release -- minor --dry-run       draft the changelog only, touch nothing else
- *   npm run release -- minor --yes           skip the review pause (non-interactive)
- *   npm run release -- minor --otp=123456    forward a 2FA code to `npm publish`
- *
- * Conventional-commit prefixes (feat/fix/perf/refactor/docs/build/revert) are sorted into
- * Added/Changed/Fixed; chore/ci/test/style commits are left out of the changelog by default.
- * Anything else (no recognized prefix) lands under "Changed" verbatim so nothing is silently
- * dropped — the review pause is there so you can fix wording or move entries before it's final.
- */
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +27,6 @@ function fail(message) {
   process.exit(1);
 }
 
-// ---------- 1. preconditions ----------
 if (!bumpArg) {
   fail('Usage: npm run release -- <patch|minor|major|x.y.z> [--dry-run] [--yes] [--otp=123456]');
 }
@@ -77,14 +56,12 @@ try {
   fail('npm is not authenticated — run `npm login` first.');
 }
 
-// ---------- 2. fail fast, before anything touches git state ----------
 console.log('\n▸ Running lint, typecheck, tests, build…\n');
 run('npm run lint');
 run('npm run typecheck');
 run('npm run test');
 run('npm run build');
 
-// ---------- 3. compute next version ----------
 function resolveVersion(current, bump) {
   if (/^\d+\.\d+\.\d+$/.test(bump)) return bump;
   const [major, minor, patch] = current.split('.').map(Number);
@@ -98,24 +75,18 @@ const pkg = JSON.parse(readFileSync(PACKAGE_PATH, 'utf8'));
 const nextVersion = resolveVersion(pkg.version, bumpArg);
 console.log(`\n▸ ${pkg.version} → ${nextVersion}`);
 
-// ---------- 4. gather commits since the last tag ----------
 let lastTag = '';
 try {
   lastTag = capture('git describe --tags --abbrev=0');
-} catch {
-  // no tags yet — the changelog will cover the full history
-}
+} catch {}
 const range = lastTag ? `${lastTag}..HEAD` : 'HEAD';
-const SEP = '';
+const SEP = '\x1f';
 let log = '';
 try {
   log = capture(`git log ${range} --no-merges --pretty=format:%s${SEP}%H`);
-} catch {
-  // empty repo — nothing to log
-}
+} catch {}
 const commits = log ? log.split('\n').map((line) => line.split(SEP)[0]) : [];
 
-// ---------- 5. categorize by conventional-commit prefix ----------
 const SECTION_BY_TYPE = {
   feat: 'Added',
   fix: 'Fixed',
@@ -130,7 +101,7 @@ const SECTION_ORDER = ['Added', 'Changed', 'Fixed', 'Deprecated', 'Removed', 'Se
 
 const sections = {};
 for (const subject of commits) {
-  if (/^release:/i.test(subject)) continue; // don't fold prior releases into this one
+  if (/^release:/i.test(subject)) continue;
   const match = subject.match(/^(\w+)(\([^)]*\))?!?:\s*(.+)$/);
   let section = 'Changed';
   let text = subject;
@@ -151,7 +122,6 @@ if (Object.keys(sections).length === 0) {
   );
 }
 
-// ---------- 6. build the changelog entry ----------
 const today = new Date().toISOString().slice(0, 10);
 const bodyLines = [];
 for (const section of SECTION_ORDER) {
@@ -172,7 +142,6 @@ if (dryRun) {
   process.exit(0);
 }
 
-// ---------- 7. write CHANGELOG.md + bump package.json (not committed yet) ----------
 const changelog = readFileSync(CHANGELOG_PATH, 'utf8');
 const marker = '\n## [';
 const insertAt = changelog.indexOf(marker);
@@ -183,7 +152,6 @@ const updatedChangelog =
 writeFileSync(CHANGELOG_PATH, updatedChangelog);
 run(`npm version ${nextVersion} --no-git-tag-version`);
 
-// ---------- 8. pause for review ----------
 if (!skipConfirm) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   await rl.question(
@@ -194,16 +162,12 @@ if (!skipConfirm) {
   rl.close();
 }
 
-// ---------- 9. commit, tag, push (commit first, then tag — never re-point an already-tagged
-//              commit once a GitHub release might reference it) ----------
 run('git add CHANGELOG.md package.json package-lock.json');
 run(`git commit -m "release: v${nextVersion}"`);
 run(`git tag -a v${nextVersion} -m "v${nextVersion}"`);
 run(`git push origin ${branch}`);
 run(`git push origin v${nextVersion}`);
 
-// ---------- 10. GitHub release — re-read the changelog so any manual edits during the pause
-//               are reflected in the release notes too ----------
 const finalChangelog = readFileSync(CHANGELOG_PATH, 'utf8');
 const escapedVersion = nextVersion.replace(/\./g, '\\.');
 const finalEntryMatch = finalChangelog.match(
@@ -218,7 +182,6 @@ try {
   unlinkSync(notesFile);
 }
 
-// ---------- 11. publish ----------
 console.log('\n▸ Publishing to npm…\n');
 run(`npm publish${otp ? ` --otp=${otp}` : ''}`);
 
