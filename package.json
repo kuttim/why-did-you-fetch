@@ -90,7 +90,7 @@
     "esbuild": "^0.27.7",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "jsdom": "^25.0.0",
+    "jsdom": "^30.0.1",
     "prettier": "^3.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
