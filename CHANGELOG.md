@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-09-07
+
+### Added
+
+- Add framework examples (vanilla, Vite+React, Next.js App Router)
+
+### Changed
+
+- Drop version pin, unify code samples with examples/
+- Add missing rapid-calls scenario
+- Group updates into one PR per ecosystem
+
 ## [0.4.0] - 2026-09-07
 
 ### Added
