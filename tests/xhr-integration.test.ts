@@ -14,6 +14,10 @@ class FakeXHR extends EventTarget {
   send(_body?: unknown): void {
     queueMicrotask(() => this.dispatchEvent(new Event('loadend')));
   }
+  abort(): void {
+    this.status = 0;
+    this.dispatchEvent(new Event('loadend'));
+  }
 }
 
 function fakeTarget() {
@@ -86,5 +90,51 @@ describe('init() with XMLHttpRequest', () => {
     expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
     uninstall();
     await Promise.resolve(); // let the two send()s' own scheduled loadend dispatches flush
+  });
+
+  it('treats a non-2xx/3xx XHR status as rejected', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget();
+    const uninstall = init({ enabled: true, patch: ['xhr'], onIssue: (i) => issues.push(i) }, target);
+
+    const a = new target.XMLHttpRequest() as unknown as FakeXHR;
+    (a as unknown as XMLHttpRequest).open('GET', '/flaky');
+    a.status = 500;
+    const settled = settle(a);
+    (a as unknown as XMLHttpRequest).send();
+    await settled;
+
+    const b = new target.XMLHttpRequest() as unknown as FakeXHR;
+    (b as unknown as XMLHttpRequest).open('GET', '/flaky');
+    b.status = 500;
+    const settledB = settle(b);
+    (b as unknown as XMLHttpRequest).send(); // same request, shortly after -> duplicate-recent
+    await settledB;
+
+    const dup = issues.find((i) => i.kind === 'duplicate-recent');
+    expect(dup).toBeDefined();
+    expect(dup?.kind === 'duplicate-recent' && dup.previous.status).toBe('rejected');
+    uninstall();
+  });
+
+  it('settles (and does not leak) an aborted request', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget();
+    const uninstall = init({ enabled: true, patch: ['xhr'], onIssue: (i) => issues.push(i) }, target);
+
+    const a = new target.XMLHttpRequest() as unknown as FakeXHR;
+    (a as unknown as XMLHttpRequest).open('GET', '/a');
+    (a as unknown as XMLHttpRequest).send();
+    a.abort();
+
+    issues.length = 0;
+    // If the aborted request never settled, it would still be sitting in the in-flight bucket
+    // and this would wrongly report a duplicate.
+    const b = new target.XMLHttpRequest() as unknown as FakeXHR;
+    (b as unknown as XMLHttpRequest).open('GET', '/a');
+    (b as unknown as XMLHttpRequest).send();
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
+    uninstall();
   });
 });

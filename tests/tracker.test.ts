@@ -12,7 +12,11 @@ function makeClock(start = 0) {
 describe('RequestTracker', () => {
   it('flags a request fired while an identical one is still in flight', () => {
     const issues: Issue[] = [];
-    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), () => 0);
+    const tracker = new RequestTracker(
+      OPTIONS,
+      (i) => issues.push(i),
+      () => 0,
+    );
 
     const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
     tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
@@ -24,7 +28,11 @@ describe('RequestTracker', () => {
 
   it('does not flag two different in-flight requests', () => {
     const issues: Issue[] = [];
-    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), () => 0);
+    const tracker = new RequestTracker(
+      OPTIONS,
+      (i) => issues.push(i),
+      () => 0,
+    );
 
     tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
     tracker.start({ kind: 'fetch', method: 'GET', url: '/b', signature: 'GET /b', stack: () => 's2' });
@@ -114,7 +122,13 @@ describe('RequestTracker', () => {
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
     const reqs = [0, 1, 2].map((i) =>
-      tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: () => `s${i}` }),
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/item/${i}`,
+        signature: `GET /item/${i}`,
+        stack: () => `s${i}`,
+      }),
     );
     clock.advance(50);
     reqs.forEach((r) => tracker.settle(r, 'resolved'));

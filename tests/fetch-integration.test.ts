@@ -70,6 +70,56 @@ describe('init() with fetch', () => {
     uninstall();
   });
 
+  it('normalizeUrl lets two differently-cache-busted URLs be treated as the same request', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init(
+      {
+        enabled: true,
+        normalizeUrl: (url) => url.replace(/([?&])_=\d+/, ''),
+        onIssue: (i) => issues.push(i),
+      },
+      target,
+    );
+
+    await target.fetch('/stats?_=1');
+    await target.fetch('/stats?_=2'); // different cache-busting param, same underlying request
+
+    expect(issues.filter((i) => i.kind === 'duplicate-recent')).toHaveLength(1);
+    uninstall();
+  });
+
+  it('tracks a Request-object input, matching duplicates by method + URL', async () => {
+    const issues: Issue[] = [];
+    let resolveResponse: (r: Response) => void;
+    const pending = new Promise<Response>((resolve) => (resolveResponse = resolve));
+    const target = fakeTarget(() => pending);
+    const uninstall = init({ enabled: true, onIssue: (i) => issues.push(i) }, target);
+
+    const p1 = target.fetch(new Request('http://localhost/users/1'));
+    const p2 = target.fetch(new Request('http://localhost/users/1'));
+    resolveResponse!(new Response('ok'));
+    await Promise.all([p1, p2]);
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(1);
+    uninstall();
+  });
+
+  it('reports a sequential-chain end to end, through init() and patched fetch', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init({ enabled: true, chainGapMs: 50, onIssue: (i) => issues.push(i) }, target);
+
+    await target.fetch('/a');
+    await target.fetch('/b');
+    await target.fetch('/c');
+
+    const chain = issues.find((i) => i.kind === 'sequential-chain');
+    expect(chain).toBeDefined();
+    expect(chain?.kind === 'sequential-chain' && chain.requests).toHaveLength(3);
+    uninstall();
+  });
+
   it('respects the ignore list', async () => {
     const issues: Issue[] = [];
     const target = fakeTarget(() => Promise.resolve(new Response('ok')));

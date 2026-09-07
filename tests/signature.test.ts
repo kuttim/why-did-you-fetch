@@ -35,6 +35,42 @@ describe('hashBody', () => {
     b.append('a', '1');
     expect(hashBody(a)).toBe(hashBody(b));
   });
+
+  it('hashes a FormData file entry by name/size/lastModified, not content', () => {
+    const a = new FormData();
+    a.append('avatar', new File(['x'], 'a.png', { type: 'image/png', lastModified: 1000 }));
+    const b = new FormData();
+    b.append('avatar', new File(['x'], 'a.png', { type: 'image/png', lastModified: 1000 }));
+    const c = new FormData();
+    c.append('avatar', new File(['x'], 'b.png', { type: 'image/png', lastModified: 1000 }));
+    expect(hashBody(a)).toBe(hashBody(b));
+    expect(hashBody(a)).not.toBe(hashBody(c));
+  });
+
+  it('hashes a Blob by type and size', () => {
+    const a = new Blob(['hello'], { type: 'text/plain' });
+    const b = new Blob(['hello'], { type: 'text/plain' });
+    const c = new Blob(['hello world'], { type: 'text/plain' });
+    expect(hashBody(a)).toBe(hashBody(b));
+    expect(hashBody(a)).not.toBe(hashBody(c));
+  });
+
+  it('hashes an ArrayBuffer by byte length', () => {
+    expect(hashBody(new ArrayBuffer(8))).toBe(hashBody(new ArrayBuffer(8)));
+    expect(hashBody(new ArrayBuffer(8))).not.toBe(hashBody(new ArrayBuffer(16)));
+  });
+
+  it('hashes a typed array view by byte length', () => {
+    expect(hashBody(new Uint8Array(4))).toBe(hashBody(new Uint8Array(4)));
+    expect(hashBody(new Uint8Array(4))).not.toBe(hashBody(new Uint8Array(8)));
+  });
+
+  it('falls back to String(body) when JSON.stringify throws (e.g. a circular object)', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => hashBody(circular)).not.toThrow();
+    expect(typeof hashBody(circular)).toBe('string');
+  });
 });
 
 describe('buildSignature', () => {
