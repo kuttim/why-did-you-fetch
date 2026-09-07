@@ -8,8 +8,8 @@
 
 Monkey-patches `fetch` and `XMLHttpRequest` to warn you, in development, about network calls
 your app almost certainly didn't mean to make: **duplicate requests fired while an identical one
-is already in flight, identical requests repeated moments after the last one finished, and runs
-of requests fired one-after-another that could have been fired together.**
+is already in flight, identical requests repeated moments after the last one finished, and
+request waterfalls — requests fired one-after-another that could have been fired together.**
 
 It's the same idea as [`why-did-you-render`][wdyr] — instrument something ubiquitous, stay
 silent until there's something worth flagging, then print a clear, actionable console message
@@ -83,11 +83,11 @@ function App() {
 
 ## What it detects
 
-| Detector             | Fires when                                                                                                     | Confidence                                                                                                                                                                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                | High — this is almost always accidental.                                                                                                                                                      |
-| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.          | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
-| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting. | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
+| Detector             | Fires when                                                                                                                           | Confidence                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                                      | High — this is almost always accidental.                                                                                                                                                      |
+| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.                                | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
+| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting — a request waterfall. | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
 
 Each issue is delivered with the call stack(s) involved, so you can jump straight to the
 offending code — the default console reporter prints them as a collapsed, color-coded group.
@@ -163,6 +163,24 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 - **Request bodies from a `Request` object** (as opposed to `init.body`) aren't fingerprinted,
   since reading them would mean consuming the stream before the real `fetch` gets to it — those
   calls are still tracked and matched by method + URL alone.
+- **Other tools that also patch `fetch`/`XMLHttpRequest`** (an API mock library, a different
+  interceptor, an APM agent) will each see whatever the previous one left behind. Call `init()`
+  as early as possible, before those, so it observes the real calls rather than another tool's
+  already-transformed ones.
+
+## Troubleshooting
+
+- **No warnings are showing up.** Confirm `init()` actually ran (it no-ops silently when
+  `NODE_ENV === 'production'`) and that the pattern you're testing matches a detector's
+  definition above — e.g. `duplicate-recent` only fires within `dedupeWindowMs` of the previous
+  call settling, not any time later.
+- **I'm seeing a duplicate warning I didn't expect under React StrictMode / Fast Refresh.**
+  Dev-mode double-invocation and hot-reload can genuinely re-fire effects and, with them, real
+  duplicate requests — that's a legitimate case for the `ignore` option, not a bug report.
+- **A request I know is duplicated isn't being flagged.** Check whether something else already
+  dedupes it (see above), whether its URL differs by a volatile query param (use
+  `normalizeUrl`), or whether it's a `Request`-object call with a differing body (see the
+  caveat above).
 
 ## Example
 
@@ -173,6 +191,12 @@ browser against a mock network layer, with sample-project code for each detected
 ## Contributing
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+## Credit
+
+Directly inspired by [`why-did-you-render`][wdyr] by Welldone Software — same idea
+(instrument something ubiquitous, stay quiet until there's something worth flagging), aimed at
+the network tab instead of the render tree.
 
 ## License
 

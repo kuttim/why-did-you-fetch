@@ -1,0 +1,46 @@
+name: Bug report
+description: Something isn't detected right, or a false positive is firing
+labels: [bug]
+body:
+  - type: textarea
+    id: pattern
+    attributes:
+      label: What request pattern triggered this (or should have, but didn't)?
+      description: A minimal code snippet is the most useful thing you can include.
+      placeholder: |
+        fetch('/api/users/42');
+        fetch('/api/users/42'); // fired again before the first settled
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: init() options
+      description: Paste what you're passing to init(), or "defaults" if none.
+      render: ts
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Are you on fetch, XMLHttpRequest, or a library on top of either?
+      options:
+        - fetch
+        - XMLHttpRequest
+        - A library on top of fetch (e.g. axios with the fetch adapter)
+        - A library on top of XHR (e.g. axios default/browser adapter)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: why-did-you-fetch version
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen, and what happened instead?
+    validations:
+      required: true
