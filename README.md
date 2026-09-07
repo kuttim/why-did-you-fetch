@@ -204,7 +204,7 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 
 **[Live demo](https://kuttim.github.io/why-did-you-fetch/)** — no install required, runs in your
 browser against a mock network layer, with sample-project code for each detected pattern
-([source](./docs/index.html)).
+([source](./docs/demo.ts), [page](./docs/index.html)).
 
 ## Contributing
 
