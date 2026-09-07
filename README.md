@@ -83,14 +83,18 @@ function App() {
 
 ## What it detects
 
-| Detector             | Fires when                                                                                                                           | Confidence                                                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                                      | High — this is almost always accidental.                                                                                                                                                      |
-| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.                                | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
-| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting — a request waterfall. | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
+| Detector             | Fires when                                                                                                                                                                                        | Confidence                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                                                                                                   | High — this is almost always accidental.                                                                                                                                                      |
+| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.                                                                                             | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
+| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting — a request waterfall.                                                              | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
+| `rapid-calls`        | Several requests (default 5+) to the same path — each with a _different_ query string — fire within a short window (default 1s). The classic shape is a search box refetching on every keystroke. | **Heuristic.** Disjoint from the two duplicate detectors above (it requires at least two distinct signatures in the burst), so it won't double-report an exact-duplicate storm.               |
 
 Each issue is delivered with the call stack(s) involved, so you can jump straight to the
 offending code — the default console reporter prints them as a collapsed, color-coded group.
+A `duplicate-recent` report also names the previous response's `Cache-Control` freshness when
+known, so you can tell "this could likely have been served from cache" apart from "the response
+said not to cache it — dedupe the in-flight request instead."
 
 ## Compatibility
 
@@ -131,13 +135,27 @@ init({
   dedupeWindowMs: 2000, // "recent duplicate" window
   chainGapMs: 10, // max gap between settle -> next start to count as "back-to-back"
   chainMinLength: 3, // how many chained requests before it's reported
+  rapidCallWindowMs: 1000, // rolling window for the rapid-calls detector
+  rapidCallMinCount: 5, // how many varying-query calls within that window trigger it
   retainMs: 5000, // how long settled requests are remembered for comparison
+  maxInflightAgeMs: 60000, // stop tracking a request that never settles after this long
+  ignoreKeepalive: true, // skip fetch(url, { keepalive: true }) beacons/analytics calls
   ignore: [
     '/analytics', // substring match
     /\/health-?check/i, // RegExp match
     (url, method) => method === 'GET' && url.endsWith('.png'), // custom predicate
   ],
   normalizeUrl: (url) => url.replace(/([?&])_=\d+/, ''), // strip cache-busting params before matching
+  normalizeBody: (body) => {
+    // Strip a volatile field before two otherwise-identical bodies are compared.
+    if (typeof body !== 'string') return body;
+    try {
+      const { traceId, ...rest } = JSON.parse(body);
+      return rest;
+    } catch {
+      return body;
+    }
+  },
   onIssue: (issue) => {
     // Fully replaces the console reporter — ship issues wherever you like.
     myLogger.warn(issue.message, issue);
