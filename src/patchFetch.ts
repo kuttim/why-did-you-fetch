@@ -24,6 +24,13 @@ function extractBody(input: RequestInfo | URL, init?: RequestInit): unknown {
   return undefined;
 }
 
+/** `init.keepalive` takes precedence; falls back to a `Request` object's own flag. */
+function isKeepalive(input: RequestInfo | URL, init?: RequestInit): boolean {
+  if (init && 'keepalive' in init) return init.keepalive === true;
+  if (typeof input === 'object' && !(input instanceof URL) && 'keepalive' in input) return input.keepalive === true;
+  return false;
+}
+
 /**
  * Wraps `target.fetch` so every call is recorded in the tracker before being handed to the
  * real implementation. Returns an `uninstall` function that restores the original.
@@ -39,18 +46,18 @@ export function patchFetch(
   const patched: FetchFn = function patchedFetch(input, init) {
     const { method, url } = extractMethodAndUrl(input, init);
 
-    if (shouldIgnore(url, method, options.ignore)) {
+    if (shouldIgnore(url, method, options.ignore) || (options.ignoreKeepalive && isKeepalive(input, init))) {
       return original.call(target, input, init);
     }
 
     const stack = captureStack();
-    const bodyHash = hashBody(extractBody(input, init));
+    const bodyHash = hashBody(options.normalizeBody(extractBody(input, init)));
     const signature = buildSignature(method, options.normalizeUrl(url), bodyHash);
     const tracked = tracker.start({ kind: 'fetch', method, url, signature, stack });
 
     const result = original.call(target, input, init);
     result.then(
-      (res) => tracker.settle(tracked, res.ok ? 'resolved' : 'rejected'),
+      (res) => tracker.settle(tracked, res.ok ? 'resolved' : 'rejected', res.headers.get('cache-control')),
       () => tracker.settle(tracked, 'rejected'),
     );
     return result;

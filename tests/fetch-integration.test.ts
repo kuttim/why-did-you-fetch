@@ -130,4 +130,89 @@ describe('init() with fetch', () => {
     expect(issues).toHaveLength(0);
     uninstall();
   });
+
+  it('skips keepalive requests by default', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init({ enabled: true, onIssue: (i) => issues.push(i) }, target);
+
+    await Promise.all([target.fetch('/beacon', { keepalive: true }), target.fetch('/beacon', { keepalive: true })]);
+
+    expect(issues).toHaveLength(0);
+    uninstall();
+  });
+
+  it('tracks keepalive requests when ignoreKeepalive is disabled', async () => {
+    const issues: Issue[] = [];
+    let resolveResponse: (r: Response) => void;
+    const pending = new Promise<Response>((resolve) => (resolveResponse = resolve));
+    const target = fakeTarget(() => pending);
+    const uninstall = init({ enabled: true, ignoreKeepalive: false, onIssue: (i) => issues.push(i) }, target);
+
+    const p1 = target.fetch('/beacon', { keepalive: true });
+    const p2 = target.fetch('/beacon', { keepalive: true });
+    resolveResponse!(new Response('ok'));
+    await Promise.all([p1, p2]);
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(1);
+    uninstall();
+  });
+
+  it('normalizeBody lets bodies differing only in a volatile field count as the same request', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init(
+      {
+        enabled: true,
+        normalizeBody: (body) => {
+          if (typeof body !== 'string') return body;
+          try {
+            const parsed = JSON.parse(body);
+            delete parsed.traceId;
+            return parsed;
+          } catch {
+            return body;
+          }
+        },
+        onIssue: (i) => issues.push(i),
+      },
+      target,
+    );
+
+    await target.fetch('/orders', { method: 'POST', body: JSON.stringify({ item: 'x', traceId: 'a' }) });
+    await target.fetch('/orders', { method: 'POST', body: JSON.stringify({ item: 'x', traceId: 'b' }) });
+
+    expect(issues.filter((i) => i.kind === 'duplicate-recent')).toHaveLength(1);
+    uninstall();
+  });
+
+  it('reports rapid-calls end to end for varying-query calls to the same path', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init({ enabled: true, rapidCallMinCount: 3, onIssue: (i) => issues.push(i) }, target);
+
+    await target.fetch('/search?q=a');
+    await target.fetch('/search?q=ab');
+    await target.fetch('/search?q=abc');
+
+    const rapid = issues.find((i) => i.kind === 'rapid-calls');
+    expect(rapid).toBeDefined();
+    expect(rapid?.kind === 'rapid-calls' && rapid.path).toBe('/search');
+    uninstall();
+  });
+
+  it('adds a cache-freshness hint to duplicate-recent when the previous response was cacheable', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() =>
+      Promise.resolve(new Response('ok', { headers: { 'Cache-Control': 'max-age=60' } })),
+    );
+    const uninstall = init({ enabled: true, onIssue: (i) => issues.push(i) }, target);
+
+    await target.fetch('/config');
+    await target.fetch('/config');
+
+    const dup = issues.find((i) => i.kind === 'duplicate-recent');
+    expect(dup?.message).toContain('cacheable for 60s');
+    uninstall();
+  });
 });

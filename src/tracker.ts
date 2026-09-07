@@ -1,3 +1,5 @@
+import { describeCacheFreshness } from './utils/cacheFreshness.js';
+import { stripQueryAndHash } from './utils/path.js';
 import type { Issue, RequestKind, ResolvedWdyfOptions, TrackedRequest } from './types.js';
 
 export interface StartParams {
@@ -12,13 +14,25 @@ export interface StartParams {
 type Clock = () => number;
 type TrackerOptions = Pick<
   ResolvedWdyfOptions,
-  'dedupeWindowMs' | 'chainGapMs' | 'chainMinLength' | 'retainMs' | 'maxInflightAgeMs'
+  | 'dedupeWindowMs'
+  | 'chainGapMs'
+  | 'chainMinLength'
+  | 'retainMs'
+  | 'maxInflightAgeMs'
+  | 'rapidCallWindowMs'
+  | 'rapidCallMinCount'
 >;
 
+interface RapidCallBucket {
+  requests: TrackedRequest[];
+  lastReportedAt: number | null;
+}
+
 /**
- * Holds everything we know about in-flight and recently-settled requests, and runs the three
- * detectors (in-flight duplicate, recent duplicate, sequential chain) as requests start and
- * settle. Framework/transport agnostic — patchFetch and patchXHR both feed it the same shape.
+ * Holds everything we know about in-flight and recently-settled requests, and runs the four
+ * detectors (in-flight duplicate, recent duplicate, sequential chain, rapid calls) as requests
+ * start and settle. Framework/transport agnostic — patchFetch and patchXHR both feed it the same
+ * shape.
  */
 export class RequestTracker {
   private nextId = 1;
@@ -28,6 +42,7 @@ export class RequestTracker {
   private lastSettledGlobal: TrackedRequest | null = null;
   private chains = new Map<number, TrackedRequest[]>();
   private reportedChains = new Set<number>();
+  private rapidCalls = new Map<string, RapidCallBucket>();
 
   constructor(
     private options: TrackerOptions,
@@ -48,6 +63,7 @@ export class RequestTracker {
       startedAt: now,
       settledAt: null,
       status: 'pending',
+      cacheControl: null,
     } as TrackedRequest;
     // Defined via a lazy getter (rather than a plain field) so formatting the stack only
     // happens for the minority of requests that actually end up in a reported issue.
@@ -56,6 +72,7 @@ export class RequestTracker {
     this.checkInflightDuplicate(request);
     this.checkRecentDuplicate(request, now);
     this.assignChain(request, now);
+    this.checkRapidCalls(request, now);
 
     const bucket = this.inflight.get(request.signature) ?? [];
     bucket.push(request);
@@ -64,9 +81,10 @@ export class RequestTracker {
     return request;
   }
 
-  settle(request: TrackedRequest, status: 'resolved' | 'rejected'): void {
+  settle(request: TrackedRequest, status: 'resolved' | 'rejected', cacheControl: string | null = null): void {
     request.status = status;
     request.settledAt = this.clock();
+    request.cacheControl = cacheControl;
 
     const bucket = this.inflight.get(request.signature);
     if (bucket) {
@@ -100,6 +118,7 @@ export class RequestTracker {
     if (!previous || previous.settledAt == null) return;
     const gapMs = now - previous.settledAt;
     if (gapMs >= 0 && gapMs <= this.options.dedupeWindowMs) {
+      const freshness = describeCacheFreshness(previous.cacheControl, gapMs);
       this.emit({
         kind: 'duplicate-recent',
         method: request.method,
@@ -107,9 +126,11 @@ export class RequestTracker {
         previous,
         current: request,
         gapMs,
-        message: `Repeated request: ${request.method} ${request.url} was fetched again only ${Math.round(
-          gapMs,
-        )}ms after an identical call finished. Consider caching or deduplicating it.`,
+        message:
+          `Repeated request: ${request.method} ${request.url} was fetched again only ${Math.round(
+            gapMs,
+          )}ms after an identical call finished. Consider caching or deduplicating it.` +
+          (freshness ? ` ${freshness}` : ''),
       });
     }
   }
@@ -142,6 +163,41 @@ export class RequestTracker {
   }
 
   /**
+   * Flags a burst of calls to the same method + path (query string ignored) with *varying*
+   * query strings — the "search box refetching on every keystroke, no debounce" pattern. This
+   * is deliberately disjoint from duplicate-inflight/duplicate-recent (which require an exact
+   * signature match): requiring at least 2 distinct signatures in the bucket means a burst of
+   * truly identical calls is left to those detectors instead of double-reported here.
+   */
+  private checkRapidCalls(request: TrackedRequest, now: number): void {
+    const path = stripQueryAndHash(request.url);
+    const key = `${request.method} ${path}`;
+    const bucket = this.rapidCalls.get(key) ?? { requests: [], lastReportedAt: null };
+    bucket.requests = bucket.requests.filter((r) => now - r.startedAt <= this.options.rapidCallWindowMs);
+    bucket.requests.push(request);
+    this.rapidCalls.set(key, bucket);
+
+    const distinctSignatures = new Set(bucket.requests.map((r) => r.signature)).size;
+    const cooling = bucket.lastReportedAt != null && now - bucket.lastReportedAt <= this.options.rapidCallWindowMs;
+
+    if (bucket.requests.length >= this.options.rapidCallMinCount && distinctSignatures >= 2 && !cooling) {
+      bucket.lastReportedAt = now;
+      const first = bucket.requests[0]!;
+      const windowMs = now - first.startedAt;
+      this.emit({
+        kind: 'rapid-calls',
+        method: request.method,
+        path,
+        requests: bucket.requests.slice(),
+        windowMs,
+        message: `${bucket.requests.length} requests to ${request.method} ${path} fired within ${Math.round(
+          windowMs,
+        )}ms of each other, each with a different query string — looks like input firing on every keystroke without debouncing. Consider debouncing, or cancelling the previous request before firing the next.`,
+      });
+    }
+  }
+
+  /**
    * A request that never settles — a hung connection, one swallowed by a service worker —
    * would otherwise sit in `inflight` forever, leaking memory and permanently flagging every
    * future identical request as a duplicate. If it does eventually settle, `settle()` no-ops
@@ -156,7 +212,7 @@ export class RequestTracker {
     }
   }
 
-  /** Drops settled/chain bookkeeping older than retainMs so long-lived pages don't leak memory. */
+  /** Drops settled/chain/rapid-call bookkeeping older than retainMs so long-lived pages don't leak memory. */
   private prune(now: number): void {
     for (const [sig, req] of this.settled) {
       if (req.settledAt != null && now - req.settledAt > this.options.retainMs) {
@@ -168,6 +224,12 @@ export class RequestTracker {
       if (last?.settledAt != null && now - last.settledAt > this.options.retainMs) {
         this.chains.delete(id);
         this.reportedChains.delete(id);
+      }
+    }
+    for (const [key, bucket] of this.rapidCalls) {
+      const last = bucket.requests[bucket.requests.length - 1];
+      if (!last || now - last.startedAt > this.options.retainMs) {
+        this.rapidCalls.delete(key);
       }
     }
   }

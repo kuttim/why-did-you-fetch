@@ -9,6 +9,7 @@ export type {
   DuplicateRecentIssue,
   Issue,
   IgnoreMatcher,
+  RapidCallsIssue,
   RequestKind,
   RequestStatus,
   SequentialChainIssue,
@@ -37,6 +38,10 @@ function resolveOptions(options: WdyfOptions): ResolvedWdyfOptions {
     onIssue: options.onIssue ?? consoleReporter,
     retainMs: options.retainMs ?? 5000,
     maxInflightAgeMs: options.maxInflightAgeMs ?? 60000,
+    rapidCallWindowMs: options.rapidCallWindowMs ?? 1000,
+    rapidCallMinCount: options.rapidCallMinCount ?? 5,
+    ignoreKeepalive: options.ignoreKeepalive ?? true,
+    normalizeBody: options.normalizeBody ?? ((body: unknown) => body),
   };
 }
 

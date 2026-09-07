@@ -43,7 +43,7 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
       return originalSend.call(this, body as never);
     }
 
-    const bodyHash = hashBody(body);
+    const bodyHash = hashBody(options.normalizeBody(body));
     const signature = buildSignature(state.method, options.normalizeUrl(state.url), bodyHash);
     const tracked = tracker.start({
       kind: 'xhr',
@@ -59,7 +59,14 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
     // map would let a later send() clobber the earlier request's association. Each send() call
     // gets its own self-contained listener, so this always settles the right request.
     const onSettle = (): void => {
-      tracker.settle(tracked, this.status >= 200 && this.status < 400 ? 'resolved' : 'rejected');
+      const status = this.status >= 200 && this.status < 400 ? 'resolved' : 'rejected';
+      let cacheControl: string | null = null;
+      try {
+        cacheControl = this.getResponseHeader('Cache-Control');
+      } catch {
+        // readyState too early, or a cross-origin response hiding headers — just skip it.
+      }
+      tracker.settle(tracked, status, cacheControl);
       this.removeEventListener('loadend', onSettle);
     };
     this.addEventListener('loadend', onSettle);

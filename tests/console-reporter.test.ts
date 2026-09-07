@@ -3,6 +3,7 @@ import { consoleReporter } from '../src/reporter/console.js';
 import type {
   DuplicateInflightIssue,
   DuplicateRecentIssue,
+  RapidCallsIssue,
   SequentialChainIssue,
   TrackedRequest,
 } from '../src/types.js';
@@ -18,6 +19,7 @@ function makeRequest(overrides: Partial<TrackedRequest> = {}): TrackedRequest {
     settledAt: 10,
     status: 'resolved',
     stack: 'at Somewhere (file.ts:1:1)',
+    cacheControl: null,
     ...overrides,
   };
 }
@@ -92,6 +94,30 @@ describe('consoleReporter', () => {
     expect(log).toHaveBeenCalledWith('stack-a');
     expect(log).toHaveBeenCalledWith('2. GET /b');
     expect(log).toHaveBeenCalledWith('3. GET /c');
+  });
+
+  it('logs each request in a rapid-calls issue', () => {
+    vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    const issue: RapidCallsIssue = {
+      kind: 'rapid-calls',
+      method: 'GET',
+      path: '/search',
+      requests: [
+        makeRequest({ url: '/search?q=a', stack: 'stack-a' }),
+        makeRequest({ url: '/search?q=ab', stack: 'stack-ab' }),
+      ],
+      windowMs: 100,
+      message: '2 requests to GET /search fired within 100ms',
+    };
+    consoleReporter(issue);
+
+    expect(log).toHaveBeenCalledWith('1. /search?q=a');
+    expect(log).toHaveBeenCalledWith('stack-a');
+    expect(log).toHaveBeenCalledWith('2. /search?q=ab');
+    expect(log).toHaveBeenCalledWith('stack-ab');
   });
 
   it('falls back to console.log when console.groupCollapsed is unavailable', () => {

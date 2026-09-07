@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { RequestTracker } from '../src/tracker.js';
 import type { Issue } from '../src/types.js';
 
-const OPTIONS = { dedupeWindowMs: 2000, chainGapMs: 10, chainMinLength: 3, retainMs: 5000, maxInflightAgeMs: 60000 };
+const OPTIONS = {
+  dedupeWindowMs: 2000,
+  chainGapMs: 10,
+  chainMinLength: 3,
+  retainMs: 5000,
+  maxInflightAgeMs: 60000,
+  rapidCallWindowMs: 1000,
+  rapidCallMinCount: 5,
+};
 
 function makeClock(start = 0) {
   let now = start;
@@ -181,5 +189,78 @@ describe('RequestTracker', () => {
     tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
 
     expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(1);
+  });
+
+  it('flags a burst of rapid calls to the same path with varying query strings', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 0; i < OPTIONS.rapidCallMinCount; i++) {
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/search?q=${'a'.repeat(i + 1)}`,
+        signature: `GET /search?q=${'a'.repeat(i + 1)} `,
+        stack: () => 's',
+      });
+      clock.advance(50);
+    }
+
+    const rapid = issues.filter((i) => i.kind === 'rapid-calls');
+    expect(rapid).toHaveLength(1);
+    expect(rapid[0]?.kind === 'rapid-calls' && rapid[0].path).toBe('/search');
+  });
+
+  it('does not flag a burst of identical calls as rapid-calls (that is duplicate-recent/inflight territory)', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 0; i < OPTIONS.rapidCallMinCount + 2; i++) {
+      const req = tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: '/search?q=a',
+        signature: 'GET /search?q=a',
+        stack: () => 's',
+      });
+      tracker.settle(req, 'resolved');
+      clock.advance(50);
+    }
+
+    expect(issues.filter((i) => i.kind === 'rapid-calls')).toHaveLength(0);
+  });
+
+  it('reports a rapid-calls burst once, then again after it cools down', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 0; i < OPTIONS.rapidCallMinCount + 3; i++) {
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/search?q=${i}`,
+        signature: `GET /search?q=${i}`,
+        stack: () => 's',
+      });
+      clock.advance(50);
+    }
+    expect(issues.filter((i) => i.kind === 'rapid-calls')).toHaveLength(1);
+
+    clock.advance(OPTIONS.rapidCallWindowMs + 1); // let the burst fully cool down
+
+    for (let i = 100; i < 100 + OPTIONS.rapidCallMinCount + 1; i++) {
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/search?q=${i}`,
+        signature: `GET /search?q=${i}`,
+        stack: () => 's',
+      });
+      clock.advance(50);
+    }
+    expect(issues.filter((i) => i.kind === 'rapid-calls')).toHaveLength(2);
   });
 });

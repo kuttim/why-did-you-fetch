@@ -19,6 +19,8 @@ export interface TrackedRequest {
   status: RequestStatus;
   /** Captured call stack (with our own internal frames stripped), for locating the call site. */
   stack: string;
+  /** The response's Cache-Control header, if known (fetch only) and the request has settled. */
+  cacheControl: string | null;
   /** Internal: chain id assigned by the sequential-chain detector. */
   chainId?: number;
 }
@@ -57,7 +59,18 @@ export interface SequentialChainIssue extends IssueBase {
   totalGapMs: number;
 }
 
-export type Issue = DuplicateInflightIssue | DuplicateRecentIssue | SequentialChainIssue;
+export interface RapidCallsIssue extends IssueBase {
+  kind: 'rapid-calls';
+  method: string;
+  /** The path shared by every call in this burst (query string and fragment stripped). */
+  path: string;
+  /** The calls that make up this burst, oldest first — each has a different query string. */
+  requests: TrackedRequest[];
+  /** Wall-clock span from the first call in the burst to the one that crossed the threshold. */
+  windowMs: number;
+}
+
+export type Issue = DuplicateInflightIssue | DuplicateRecentIssue | SequentialChainIssue | RapidCallsIssue;
 
 export type IgnoreMatcher = string | RegExp | ((url: string, method: string) => boolean);
 
@@ -105,6 +118,27 @@ export interface WdyfOptions {
    * identical request as a duplicate. Default: 60000 (1 minute).
    */
   maxInflightAgeMs?: number;
+  /**
+   * Rolling window (ms) for the `rapid-calls` detector: this many calls to the same method +
+   * path (query string ignored) within this window — each with a *different* query string, so
+   * it doesn't overlap with duplicate-inflight/duplicate-recent — is reported as likely
+   * unthrottled input (e.g. a search box firing on every keystroke). Default: 1000.
+   */
+  rapidCallWindowMs?: number;
+  /** How many calls within `rapidCallWindowMs` trigger the `rapid-calls` detector. Default: 5. */
+  rapidCallMinCount?: number;
+  /**
+   * Skip requests made with `fetch(url, { keepalive: true })` — analytics/beacon calls fired on
+   * page unload are usually intentional and repetitive by design. XHR has no equivalent flag.
+   * Default: true.
+   */
+  ignoreKeepalive?: boolean;
+  /**
+   * Transform a request body before it's used for duplicate matching — e.g. to strip a volatile
+   * field (a trace id, a timestamp) so two otherwise-identical bodies are recognized as the same
+   * request. Does not affect the actual request body sent. Default: identity (no change).
+   */
+  normalizeBody?: (body: unknown) => unknown;
 }
 
 export type ResolvedWdyfOptions = Required<WdyfOptions>;
