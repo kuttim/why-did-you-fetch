@@ -171,6 +171,14 @@ if (!skipConfirm) {
 
 run('git add CHANGELOG.md package.json package-lock.json docs/index.html');
 run(`git commit -m "release: v${nextVersion}"`);
+
+// npm publish before anything GitHub-facing: if it fails (2FA prompt, registry hiccup), the
+// only cleanup needed is a local `git reset` — nothing public has been touched yet. Doing it
+// last would leave a pushed tag and a public release pointing at a version that was never
+// actually published, which isn't cleanly recoverable by re-running this script.
+console.log('\n▸ Publishing to npm…\n');
+run(`npm publish${otp ? ` --otp=${otp}` : ''}`);
+
 run(`git tag -a v${nextVersion} -m "v${nextVersion}"`);
 run(`git push origin ${branch}`);
 run(`git push origin v${nextVersion}`);
@@ -188,9 +196,6 @@ try {
 } finally {
   unlinkSync(notesFile);
 }
-
-console.log('\n▸ Publishing to npm…\n');
-run(`npm publish${otp ? ` --otp=${otp}` : ''}`);
 
 console.log(`\n✔ Released v${nextVersion}.`);
 console.log(`  https://github.com/kuttim/why-did-you-fetch/releases/tag/v${nextVersion}`);
