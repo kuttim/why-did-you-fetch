@@ -46,7 +46,7 @@ export function patchFetch(target: typeof globalThis, tracker: RequestTracker, o
 
     const result = original.call(target, input, init);
     result.then(
-      () => tracker.settle(tracked, 'resolved'),
+      (res) => tracker.settle(tracked, res.ok ? 'resolved' : 'rejected'),
       () => tracker.settle(tracked, 'rejected'),
     );
     return result;

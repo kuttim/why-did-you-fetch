@@ -56,6 +56,20 @@ describe('init() with fetch', () => {
     uninstall();
   });
 
+  it('treats a non-ok HTTP response as rejected, not resolved', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget(() => Promise.resolve(new Response('error', { status: 500 })));
+    const uninstall = init({ enabled: true, onIssue: (i) => issues.push(i) }, target);
+
+    await target.fetch('/flaky');
+    await target.fetch('/flaky'); // same request, shortly after -> triggers duplicate-recent
+
+    const dup = issues.find((i) => i.kind === 'duplicate-recent');
+    expect(dup).toBeDefined();
+    expect(dup?.kind === 'duplicate-recent' && dup.previous.status).toBe('rejected');
+    uninstall();
+  });
+
   it('respects the ignore list', async () => {
     const issues: Issue[] = [];
     const target = fakeTarget(() => Promise.resolve(new Response('ok')));

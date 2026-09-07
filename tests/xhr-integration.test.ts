@@ -57,4 +57,34 @@ describe('init() with XMLHttpRequest', () => {
     expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(1);
     uninstall();
   });
+
+  it('settles the right tracked request when one XHR instance is reused before the prior request settles', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget();
+    const uninstall = init({ enabled: true, patch: ['xhr'], onIssue: (i) => issues.push(i) }, target);
+
+    const xhr = new target.XMLHttpRequest() as unknown as FakeXHR;
+    const raw = xhr as unknown as XMLHttpRequest;
+
+    raw.open('GET', '/a');
+    raw.send();
+    // Reuse the same instance for a different request before the first has settled — the
+    // "cancel and restart on new input" pattern this library exists to help with.
+    raw.open('GET', '/b');
+    raw.send();
+
+    // A single loadend, as a real browser reusing an XHR may deliver only once. dispatchEvent
+    // is synchronous, so both internally-registered listeners run before this returns.
+    xhr.dispatchEvent(new Event('loadend'));
+    issues.length = 0;
+
+    // If the first request never actually settled (the bug this regresses), it's still sitting
+    // in the tracker's in-flight bucket for "GET /a" and this wrongly reports another duplicate.
+    raw.open('GET', '/a');
+    raw.send();
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
+    uninstall();
+    await Promise.resolve(); // let the two send()s' own scheduled loadend dispatches flush
+  });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RequestTracker } from '../src/tracker.js';
 import type { Issue } from '../src/types.js';
 
-const OPTIONS = { dedupeWindowMs: 2000, chainGapMs: 10, chainMinLength: 3, retainMs: 5000 };
+const OPTIONS = { dedupeWindowMs: 2000, chainGapMs: 10, chainMinLength: 3, retainMs: 5000, maxInflightAgeMs: 60000 };
 
 function makeClock(start = 0) {
   let now = start;
@@ -14,8 +14,8 @@ describe('RequestTracker', () => {
     const issues: Issue[] = [];
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), () => 0);
 
-    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's1' });
-    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's2' });
+    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.kind).toBe('duplicate-inflight');
@@ -26,8 +26,8 @@ describe('RequestTracker', () => {
     const issues: Issue[] = [];
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), () => 0);
 
-    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's1' });
-    tracker.start({ kind: 'fetch', method: 'GET', url: '/b', signature: 'GET /b', stack: 's2' });
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/b', signature: 'GET /b', stack: () => 's2' });
 
     expect(issues).toHaveLength(0);
   });
@@ -37,12 +37,12 @@ describe('RequestTracker', () => {
     const issues: Issue[] = [];
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
-    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's1' });
+    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
     clock.advance(100);
     tracker.settle(first, 'resolved');
     clock.advance(500); // well within the 2000ms dedupe window
 
-    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's2' });
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.kind).toBe('duplicate-recent');
@@ -54,12 +54,12 @@ describe('RequestTracker', () => {
     const issues: Issue[] = [];
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
-    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's1' });
+    const first = tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
     clock.advance(100);
     tracker.settle(first, 'resolved');
     clock.advance(3000); // outside the 2000ms window
 
-    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: 's2' });
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
 
     expect(issues).toHaveLength(0);
   });
@@ -70,7 +70,13 @@ describe('RequestTracker', () => {
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
     for (let i = 0; i < 3; i++) {
-      const req = tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: `s${i}` });
+      const req = tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/item/${i}`,
+        signature: `GET /item/${i}`,
+        stack: () => `s${i}`,
+      });
       clock.advance(2); // well under chainGapMs of 10
       tracker.settle(req, 'resolved');
       clock.advance(1);
@@ -87,7 +93,13 @@ describe('RequestTracker', () => {
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
     for (let i = 0; i < 6; i++) {
-      const req = tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: `s${i}` });
+      const req = tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/item/${i}`,
+        signature: `GET /item/${i}`,
+        stack: () => `s${i}`,
+      });
       clock.advance(2);
       tracker.settle(req, 'resolved');
       clock.advance(1);
@@ -102,7 +114,7 @@ describe('RequestTracker', () => {
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
     const reqs = [0, 1, 2].map((i) =>
-      tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: `s${i}` }),
+      tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: () => `s${i}` }),
     );
     clock.advance(50);
     reqs.forEach((r) => tracker.settle(r, 'resolved'));
@@ -116,12 +128,44 @@ describe('RequestTracker', () => {
     const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
 
     for (let i = 0; i < 3; i++) {
-      const req = tracker.start({ kind: 'fetch', method: 'GET', url: `/item/${i}`, signature: `GET /item/${i}`, stack: `s${i}` });
+      const req = tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/item/${i}`,
+        signature: `GET /item/${i}`,
+        stack: () => `s${i}`,
+      });
       clock.advance(2);
       tracker.settle(req, 'resolved');
       clock.advance(1000); // far beyond chainGapMs of 10
     }
 
     expect(issues.filter((i) => i.kind === 'sequential-chain')).toHaveLength(0);
+  });
+
+  it('evicts a request that never settles so it stops permanently flagging duplicates', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/hung', signature: 'GET /hung', stack: () => 's1' });
+    // never settled — simulates a hung connection
+
+    clock.advance(OPTIONS.maxInflightAgeMs + 1);
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/hung', signature: 'GET /hung', stack: () => 's2' });
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
+  });
+
+  it('still flags a genuine duplicate while the first request is within maxInflightAgeMs', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's1' });
+    clock.advance(OPTIONS.maxInflightAgeMs - 1);
+    tracker.start({ kind: 'fetch', method: 'GET', url: '/a', signature: 'GET /a', stack: () => 's2' });
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(1);
   });
 });

@@ -5,11 +5,15 @@ export interface StartParams {
   method: string;
   url: string;
   signature: string;
-  stack: string;
+  /** Lazy — formatting a captured stack is the expensive part, deferred until actually read. */
+  stack: () => string;
 }
 
 type Clock = () => number;
-type TrackerOptions = Pick<ResolvedWdyfOptions, 'dedupeWindowMs' | 'chainGapMs' | 'chainMinLength' | 'retainMs'>;
+type TrackerOptions = Pick<
+  ResolvedWdyfOptions,
+  'dedupeWindowMs' | 'chainGapMs' | 'chainMinLength' | 'retainMs' | 'maxInflightAgeMs'
+>;
 
 /**
  * Holds everything we know about in-flight and recently-settled requests, and runs the three
@@ -33,7 +37,9 @@ export class RequestTracker {
 
   start(params: StartParams): TrackedRequest {
     const now = this.clock();
-    const request: TrackedRequest = {
+    this.pruneStaleInflight(now);
+
+    const request = {
       id: this.nextId++,
       kind: params.kind,
       method: params.method,
@@ -42,8 +48,10 @@ export class RequestTracker {
       startedAt: now,
       settledAt: null,
       status: 'pending',
-      stack: params.stack,
-    };
+    } as TrackedRequest;
+    // Defined via a lazy getter (rather than a plain field) so formatting the stack only
+    // happens for the minority of requests that actually end up in a reported issue.
+    Object.defineProperty(request, 'stack', { enumerable: true, configurable: true, get: params.stack });
 
     this.checkInflightDuplicate(request);
     this.checkRecentDuplicate(request, now);
@@ -130,6 +138,21 @@ export class RequestTracker {
           totalGapMs,
         )}ms serialized so far: ${chain.map((r) => r.url).join(' -> ')}). If they don't depend on each other's results, consider firing them together with Promise.all.`,
       });
+    }
+  }
+
+  /**
+   * A request that never settles — a hung connection, one swallowed by a service worker —
+   * would otherwise sit in `inflight` forever, leaking memory and permanently flagging every
+   * future identical request as a duplicate. If it does eventually settle, `settle()` no-ops
+   * harmlessly on the (already-removed) inflight bookkeeping but still records it as settled.
+   */
+  private pruneStaleInflight(now: number): void {
+    for (const [sig, bucket] of this.inflight) {
+      const fresh = bucket.filter((req) => now - req.startedAt <= this.options.maxInflightAgeMs);
+      if (fresh.length === bucket.length) continue;
+      if (fresh.length === 0) this.inflight.delete(sig);
+      else this.inflight.set(sig, fresh);
     }
   }
 

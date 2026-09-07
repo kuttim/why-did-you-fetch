@@ -1,7 +1,7 @@
 import { shouldIgnore } from './ignore.js';
 import { buildSignature, hashBody } from './signature.js';
 import type { RequestTracker } from './tracker.js';
-import type { ResolvedWdyfOptions, TrackedRequest } from './types.js';
+import type { ResolvedWdyfOptions } from './types.js';
 import { captureStack } from './utils/stack.js';
 
 type OpenFn = typeof XMLHttpRequest.prototype.open;
@@ -10,7 +10,7 @@ type SendFn = typeof XMLHttpRequest.prototype.send;
 interface OpenState {
   method: string;
   url: string;
-  stack: string;
+  stack: () => string;
 }
 
 /**
@@ -23,7 +23,6 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
   if (!XHR) return () => {};
 
   const openState = new WeakMap<XMLHttpRequest, OpenState>();
-  const trackedRequest = new WeakMap<XMLHttpRequest, TrackedRequest>();
 
   const originalOpen: OpenFn = XHR.prototype.open;
   const originalSend: SendFn = XHR.prototype.send;
@@ -48,13 +47,14 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
       signature,
       stack: state.stack,
     });
-    trackedRequest.set(this, tracked);
 
+    // `tracked` is captured directly in this closure rather than looked up from a map keyed
+    // by `this` — an XHR instance can be reused (open()+send() again before the prior
+    // request's loadend fires, e.g. cancel-and-restart on user input), and a shared per-instance
+    // map would let a later send() clobber the earlier request's association. Each send() call
+    // gets its own self-contained listener, so this always settles the right request.
     const onSettle = (): void => {
-      const t = trackedRequest.get(this);
-      if (!t) return;
-      tracker.settle(t, this.status >= 200 && this.status < 400 ? 'resolved' : 'rejected');
-      trackedRequest.delete(this);
+      tracker.settle(tracked, this.status >= 200 && this.status < 400 ? 'resolved' : 'rejected');
       this.removeEventListener('loadend', onSettle);
     };
     this.addEventListener('loadend', onSettle);

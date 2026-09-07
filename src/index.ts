@@ -36,6 +36,7 @@ function resolveOptions(options: WdyfOptions): ResolvedWdyfOptions {
     normalizeUrl: options.normalizeUrl ?? ((url: string) => url),
     onIssue: options.onIssue ?? consoleReporter,
     retainMs: options.retainMs ?? 5000,
+    maxInflightAgeMs: options.maxInflightAgeMs ?? 60000,
   };
 }
 

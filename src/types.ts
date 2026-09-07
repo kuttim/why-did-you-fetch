@@ -99,6 +99,12 @@ export interface WdyfOptions {
   onIssue?: (issue: Issue) => void;
   /** How long settled requests are kept around for dedupe/chain comparisons. Default: 5000. */
   retainMs?: number;
+  /**
+   * A request that never settles (a hung connection, one swallowed by a service worker) is
+   * stopped tracking after this long, so it can't leak memory or permanently flag every future
+   * identical request as a duplicate. Default: 60000 (1 minute).
+   */
+  maxInflightAgeMs?: number;
 }
 
 export type ResolvedWdyfOptions = Required<WdyfOptions>;
