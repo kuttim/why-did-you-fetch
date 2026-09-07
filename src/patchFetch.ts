@@ -28,7 +28,11 @@ function extractBody(input: RequestInfo | URL, init?: RequestInit): unknown {
  * Wraps `target.fetch` so every call is recorded in the tracker before being handed to the
  * real implementation. Returns an `uninstall` function that restores the original.
  */
-export function patchFetch(target: typeof globalThis, tracker: RequestTracker, options: ResolvedWdyfOptions): () => void {
+export function patchFetch(
+  target: typeof globalThis,
+  tracker: RequestTracker,
+  options: ResolvedWdyfOptions,
+): () => void {
   const original = target.fetch as FetchFn | undefined;
   if (typeof original !== 'function') return () => {};
 

@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+package-lock.json
+CHANGELOG.md
+
+# Hand-formatted; extracting/checking its inline script is a separate, bigger effort.
+docs/index.html

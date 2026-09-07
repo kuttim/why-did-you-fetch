@@ -27,7 +27,10 @@ describe('useWhyDidYouFetch', () => {
   it('wires onIssue through to init() and reports through it', () => {
     // Stub a never-settling fetch so we only exercise the synchronous in-flight check,
     // without depending on a real network call.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
     const issues: Issue[] = [];
     const { unmount } = render(createElement(TestComponent, { options: { onIssue: (i) => issues.push(i) } }));
 

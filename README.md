@@ -21,9 +21,9 @@ layer, with sample-project code for each detected pattern.
 
 ![The live demo's network and console panels, showing a real duplicate-in-flight warning for two GET requests to /api/users/42 fired 462ms apart with no gap, and the matching console message: "Duplicate in-flight request: GET /api/users/42 was requested again before the first call finished."](./.github/readme/console-output.png)
 
-*Real output from the [live demo](https://kuttim.github.io/why-did-you-fetch/) — the left panel
+_Real output from the [live demo](https://kuttim.github.io/why-did-you-fetch/) — the left panel
 is the demo's simulated network view, the right panel mirrors what actually prints to your
-browser's real console.*
+browser's real console._
 
 ## Why
 
@@ -83,11 +83,11 @@ function App() {
 
 ## What it detects
 
-| Detector | Fires when | Confidence |
-| --- | --- | --- |
-| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled. | High — this is almost always accidental. |
-| `duplicate-recent` | The exact same request is issued again shortly (default 2s) after an identical call already finished. | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled. |
-| `sequential-chain` | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting. | **Heuristic.** This flags the *pattern* of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
+| Detector             | Fires when                                                                                                     | Confidence                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                | High — this is almost always accidental.                                                                                                                                                      |
+| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.          | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
+| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting. | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
 
 Each issue is delivered with the call stack(s) involved, so you can jump straight to the
 offending code — the default console reporter prints them as a collapsed, color-coded group.
@@ -98,18 +98,18 @@ offending code — the default console reporter prints them as a collapsed, colo
 API is missing, that half of the patch is silently skipped — calling `init()` is always safe, it
 just won't catch anything in an environment with neither.
 
-| Environment | `fetch` | `XMLHttpRequest` |
-| --- | --- | --- |
-| Any browser (React, Vue, Svelte, Angular, vanilla) | ✅ | ✅ |
-| React Native | ✅ | ✅ |
-| Electron — renderer process | ✅ | ✅ |
-| Electron — main process | ✅ (Node ≥18) | ❌ |
-| Dedicated Web Worker | ✅ | ✅ |
-| Service Worker | ✅ | ❌ |
-| Node.js ≥18 | ✅ (native, via `undici`) | ❌ (never implemented) |
-| Node.js <18 | ❌ (unless polyfilled) | ❌ |
-| Deno | ✅ | ❌ |
-| Bun | ✅ | ❌ |
+| Environment                                        | `fetch`                   | `XMLHttpRequest`       |
+| -------------------------------------------------- | ------------------------- | ---------------------- |
+| Any browser (React, Vue, Svelte, Angular, vanilla) | ✅                        | ✅                     |
+| React Native                                       | ✅                        | ✅                     |
+| Electron — renderer process                        | ✅                        | ✅                     |
+| Electron — main process                            | ✅ (Node ≥18)             | ❌                     |
+| Dedicated Web Worker                               | ✅                        | ✅                     |
+| Service Worker                                     | ✅                        | ❌                     |
+| Node.js ≥18                                        | ✅ (native, via `undici`) | ❌ (never implemented) |
+| Node.js <18                                        | ❌ (unless polyfilled)    | ❌                     |
+| Deno                                               | ✅                        | ❌                     |
+| Bun                                                | ✅                        | ❌                     |
 
 A couple of specifics worth calling out:
 
@@ -127,14 +127,14 @@ A couple of specifics worth calling out:
 ```ts
 init({
   enabled: process.env.NODE_ENV !== 'production', // default
-  patch: ['fetch', 'xhr'],                          // default: both
-  dedupeWindowMs: 2000,                             // "recent duplicate" window
-  chainGapMs: 10,                                   // max gap between settle -> next start to count as "back-to-back"
-  chainMinLength: 3,                                // how many chained requests before it's reported
-  retainMs: 5000,                                   // how long settled requests are remembered for comparison
+  patch: ['fetch', 'xhr'], // default: both
+  dedupeWindowMs: 2000, // "recent duplicate" window
+  chainGapMs: 10, // max gap between settle -> next start to count as "back-to-back"
+  chainMinLength: 3, // how many chained requests before it's reported
+  retainMs: 5000, // how long settled requests are remembered for comparison
   ignore: [
-    '/analytics',                                    // substring match
-    /\/health-?check/i,                              // RegExp match
+    '/analytics', // substring match
+    /\/health-?check/i, // RegExp match
     (url, method) => method === 'GET' && url.endsWith('.png'), // custom predicate
   ],
   normalizeUrl: (url) => url.replace(/([?&])_=\d+/, ''), // strip cache-busting params before matching

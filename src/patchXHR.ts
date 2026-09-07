@@ -27,7 +27,12 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
   const originalOpen: OpenFn = XHR.prototype.open;
   const originalSend: SendFn = XHR.prototype.send;
 
-  XHR.prototype.open = function patchedOpen(this: XMLHttpRequest, method: string, url: string | URL, ...rest: unknown[]) {
+  XHR.prototype.open = function patchedOpen(
+    this: XMLHttpRequest,
+    method: string,
+    url: string | URL,
+    ...rest: unknown[]
+  ) {
     openState.set(this, { method: method.toUpperCase(), url: url.toString(), stack: captureStack() });
     return (originalOpen as (...args: unknown[]) => void).apply(this, [method, url, ...rest]);
   } as OpenFn;

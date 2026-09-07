@@ -14,9 +14,7 @@ export function captureStack(): () => string {
     const raw = err.stack ?? '';
     const lines = raw.split('\n');
     // Drop the "Error" header line and any frame that mentions our own internal modules.
-    const filtered = lines
-      .slice(1)
-      .filter((line) => !/why-did-you-fetch|patchFetch|patchXHR|captureStack/.test(line));
+    const filtered = lines.slice(1).filter((line) => !/why-did-you-fetch|patchFetch|patchXHR|captureStack/.test(line));
     cached = filtered.join('\n').trim() || raw.trim();
     return cached;
   };
