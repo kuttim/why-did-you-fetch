@@ -5,7 +5,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # Every npm update lands as one combined PR instead of one per package.
+    # Separate PRs all touch package.json/package-lock.json, so they queue up
+    # and conflict with each other the moment more than one is open at a time.
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - '*'
