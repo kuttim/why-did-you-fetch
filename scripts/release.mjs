@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline/promises';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
 const PACKAGE_PATH = join(ROOT, 'package.json');
+const DEMO_PATH = join(ROOT, 'docs', 'index.html');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -152,6 +153,12 @@ const updatedChangelog =
 writeFileSync(CHANGELOG_PATH, updatedChangelog);
 run(`npm version ${nextVersion} --no-git-tag-version`);
 
+const demo = readFileSync(DEMO_PATH, 'utf8');
+const updatedDemo = demo
+  .replace(/why-did-you-fetch@\d+\.\d+\.\d+/g, `why-did-you-fetch@${nextVersion}`)
+  .replace(/(class="version-pill">v)\d+\.\d+\.\d+(<\/span>)/, `$1${nextVersion}$2`);
+writeFileSync(DEMO_PATH, updatedDemo);
+
 if (!skipConfirm) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   await rl.question(
@@ -162,7 +169,7 @@ if (!skipConfirm) {
   rl.close();
 }
 
-run('git add CHANGELOG.md package.json package-lock.json');
+run('git add CHANGELOG.md package.json package-lock.json docs/index.html');
 run(`git commit -m "release: v${nextVersion}"`);
 run(`git tag -a v${nextVersion} -m "v${nextVersion}"`);
 run(`git push origin ${branch}`);

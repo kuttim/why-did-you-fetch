@@ -1,5 +1,11 @@
 # why-did-you-fetch
 
+[![npm version](https://img.shields.io/npm/v/why-did-you-fetch.svg)](https://www.npmjs.com/package/why-did-you-fetch)
+[![CI](https://github.com/kuttim/why-did-you-fetch/actions/workflows/ci.yml/badge.svg)](https://github.com/kuttim/why-did-you-fetch/actions/workflows/ci.yml)
+[![types](https://img.shields.io/npm/types/why-did-you-fetch.svg)](./src/types.ts)
+[![npm downloads](https://img.shields.io/npm/dm/why-did-you-fetch.svg)](https://www.npmjs.com/package/why-did-you-fetch)
+[![license](https://img.shields.io/npm/l/why-did-you-fetch.svg)](./LICENSE)
+
 **[Try the live demo →](https://kuttim.github.io/why-did-you-fetch/)**
 No install required — it runs the real published package in your browser against a mock network
 layer, with sample-project code for each detected pattern.
@@ -13,11 +19,11 @@ It's the same idea as [`why-did-you-render`][wdyr] — instrument something ubiq
 silent until there's something worth flagging, then print a clear, actionable console message
 with the call site — applied to the network tab instead of the render tree.
 
-```
-DUPLICATE (in-flight)  GET /api/user/42 was requested again before the first call finished.
-  First call:      at UserCard (UserCard.tsx:12)
-  Duplicate call:  at Avatar (Avatar.tsx:8)
-```
+![The live demo's network and console panels, showing a real duplicate-in-flight warning for two GET requests to /api/users/42 fired 462ms apart with no gap, and the matching console message: "Duplicate in-flight request: GET /api/users/42 was requested again before the first call finished."](./.github/readme/console-output.png)
+
+*Real output from the [live demo](https://kuttim.github.io/why-did-you-fetch/) — the left panel
+is the demo's simulated network view, the right panel mirrors what actually prints to your
+browser's real console.*
 
 ## Why
 
