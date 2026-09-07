@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-09-07
+
+### Added
+
+- Rapid-calls detector, cache-control hints, keepalive/normalizeBody options
+
+### Changed
+
+- Link demo.ts as the demo's source in README
+- Document rapid-calls, cache-freshness hints, new options
+- Add SECURITY.md, issue template, dependabot; README additions
+- Move live demo CTA after the pitch, before the screenshot
+- Add badges, real console screenshot, repository metadata
+
+### Fixed
+
+- Publish to npm before irreversible GitHub steps in release script
+- Nest exports types per-condition for correct CJS/ESM resolution
+- Inflight leak, fetch/XHR status mismatch, XHR reuse; lazy stack capture
+
 ## [0.3.0] - 2026-09-06
 
 ### Changed

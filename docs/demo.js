@@ -1,4 +1,4 @@
-import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch@0.3.0/dist/index.js";
+import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch@0.4.0/dist/index.js";
 const DEMO_OPTIONS = { dedupeWindowMs: 1500, chainGapMs: 50, chainMinLength: 3, retainMs: 5e3 };
 const LABEL = {
   "duplicate-inflight": "DUPLICATE \xB7 IN-FLIGHT",
