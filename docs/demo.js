@@ -1,4 +1,4 @@
-import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch@0.4.0/dist/index.js";
+import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js";
 const DEMO_OPTIONS = { dedupeWindowMs: 1500, chainGapMs: 50, chainMinLength: 3, retainMs: 5e3 };
 const LABEL = {
   "duplicate-inflight": "DUPLICATE \xB7 IN-FLIGHT",
@@ -311,25 +311,51 @@ const FRAMEWORK_SAMPLES = [
     name: "Vanilla / any framework",
     code: `import { init } from 'why-did-you-fetch';
 
-init(); // no-ops automatically in production`
+init(); // no-ops automatically in production
+
+// Full runnable version: examples/vanilla`
   },
   {
-    name: "React",
-    code: `import { useWhyDidYouFetch } from 'why-did-you-fetch/react';
+    name: "Vite + React",
+    code: `// main.tsx \u2014 called at the true entry point, before React renders
+// anything. React fires effects children-before-parents, so calling
+// useWhyDidYouFetch() inside App would only install the patch *after*
+// App's own children had already fired their first-mount fetches.
+import { createRoot } from 'react-dom/client';
+import { init } from 'why-did-you-fetch';
+import { App } from './App';
 
-function App() {
+init();
+
+createRoot(document.getElementById('root')!).render(<App />);
+
+// Full runnable version: examples/vite-react`
+  },
+  {
+    name: "Next.js App Router",
+    code: `// app/wdyf-init.tsx \u2014 a client-only sibling, not a parent, of the
+// rest of the tree: Next renders Client Component code on the server
+// too, where fetch is already patched for Next's own cache/revalidate
+// layer. useWhyDidYouFetch() installs inside a useEffect, which React
+// never runs on the server, so only client-side fetches get patched.
+'use client';
+import { useWhyDidYouFetch } from 'why-did-you-fetch/react';
+
+export function WhyDidYouFetchInit() {
   useWhyDidYouFetch();
-  return <YourApp />;
-}`
-  },
-  {
-    name: "Axios / other XHR clients",
-    code: `import { init } from 'why-did-you-fetch';
+  return null;
+}
 
-// Covered automatically \u2014 axios (browser build) and most
-// HTTP clients sit on top of XMLHttpRequest, which init()
-// patches alongside fetch.
-init();`
+// app/layout.tsx \u2014 rendered as an early sibling of {children}, so its
+// effect (React fires siblings' effects in document order) completes
+// before the page's own fetching components mount:
+//
+//   <body>
+//     <WhyDidYouFetchInit />
+//     {children}
+//   </body>
+
+// Full runnable version: examples/nextjs-app-router`
   }
 ];
 const fwTabs = document.getElementById("framework-tabs");

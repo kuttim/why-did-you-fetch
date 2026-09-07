@@ -10,7 +10,6 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
 const PACKAGE_PATH = join(ROOT, 'package.json');
 const DEMO_HTML_PATH = join(ROOT, 'docs', 'index.html');
-const DEMO_TS_PATH = join(ROOT, 'docs', 'demo.ts');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -157,14 +156,11 @@ writeFileSync(CHANGELOG_PATH, updatedChangelog);
 run(`npm version ${nextVersion} --no-git-tag-version`);
 
 const demoHtml = readFileSync(DEMO_HTML_PATH, 'utf8');
-const updatedDemoHtml = demoHtml
-  .replace(/why-did-you-fetch@\d+\.\d+\.\d+/g, `why-did-you-fetch@${nextVersion}`)
-  .replace(/(class="version-pill">v)\d+\.\d+\.\d+(<\/span>)/, `$1${nextVersion}$2`);
+const updatedDemoHtml = demoHtml.replace(/(class="version-pill">v)\d+\.\d+\.\d+(<\/span>)/, `$1${nextVersion}$2`);
 writeFileSync(DEMO_HTML_PATH, updatedDemoHtml);
 
-const demoTs = readFileSync(DEMO_TS_PATH, 'utf8');
-const updatedDemoTs = demoTs.replace(/why-did-you-fetch@\d+\.\d+\.\d+/g, `why-did-you-fetch@${nextVersion}`);
-writeFileSync(DEMO_TS_PATH, updatedDemoTs);
+// docs/demo.ts imports from jsDelivr's unversioned URL (always latest), so there's no version
+// string in it to bump — still rebuilt in case it changed for unrelated reasons this release.
 run('npm run build:demo');
 
 if (!skipConfirm) {
