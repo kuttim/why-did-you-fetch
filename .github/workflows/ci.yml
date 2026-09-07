@@ -25,3 +25,20 @@ jobs:
       - run: npm run build
       - run: npm run build:demo
       - run: git diff --exit-code docs/demo.js
+
+  examples:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example: [vite-react, nextjs-app-router]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/${{ matrix.example }}/package-lock.json
+      - run: npm ci
+        working-directory: examples/${{ matrix.example }}
+      - run: npm run build
+        working-directory: examples/${{ matrix.example }}

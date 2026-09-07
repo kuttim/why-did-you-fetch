@@ -185,6 +185,14 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
   interceptor, an APM agent) will each see whatever the previous one left behind. Call `init()`
   as early as possible, before those, so it observes the real calls rather than another tool's
   already-transformed ones.
+- **The React hook can miss its own children's very first fetches.** It installs in a
+  `useEffect`, and React fires effects children-before-parents — so if `useWhyDidYouFetch()` is
+  called in a root/layout component, fetches its descendants make during that first mount can
+  happen before the patch is installed. Everything after that (re-renders, remounts, StrictMode's
+  second pass) is caught normally. For guaranteed first-paint coverage, call `init()` directly at
+  your app's real entry point instead — see [`examples/vite-react`](./examples/vite-react); the
+  hook remains the right choice when you don't control the entry point, like in Next.js — see
+  [`examples/nextjs-app-router`](./examples/nextjs-app-router).
 
 ## Troubleshooting
 
@@ -200,11 +208,15 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
   `normalizeUrl`), or whether it's a `Request`-object call with a differing body (see the
   caveat above).
 
-## Example
+## Examples
 
 **[Live demo](https://kuttim.github.io/why-did-you-fetch/)** — no install required, runs in your
 browser against a mock network layer, with sample-project code for each detected pattern
 ([source](./docs/demo.ts), [page](./docs/index.html)).
+
+Real, runnable integrations live in [`examples/`](./examples) — a zero-build vanilla page, a
+Vite + React project, and a Next.js App Router project (the one place `useWhyDidYouFetch()`'s
+SSR-safety and effect-ordering behavior actually matters — see its README for why).
 
 ## Contributing
 

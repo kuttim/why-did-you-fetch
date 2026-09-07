@@ -5,7 +5,9 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config.ts'],
+    // examples/** are standalone projects with their own tooling/tsconfig — not part of this
+    // package's own lint/typecheck project.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.config.ts', 'examples/**'],
   },
   {
     files: ['**/*.ts'],
