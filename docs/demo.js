@@ -129,6 +129,36 @@ const SCENARIOS = {
       await logged(target, "GET", "/api/notifications/count");
       await logged(target, "GET", "/api/billing/status");
     }
+  },
+  rapid: {
+    label: "Rapid same-endpoint calls",
+    desc: "SearchBox fires a new request on every keystroke with no debounce \u2014 five different queries to the same endpoint inside a second.",
+    latency: 180,
+    files: [
+      {
+        name: "SearchBox.tsx",
+        code: `function SearchBox() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (!query) return;
+    fetch(\`/api/search?q=` + esc("query") + `\`)
+      .then((r) => r.json())
+      .then((data) => setResults(data.results));
+  }, [query]); // fires on every keystroke \u2014 no debounce
+
+  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;
+}`
+      }
+    ],
+    async run(target) {
+      for (const q of ["r", "re", "rea", "reac", "react"]) {
+        logged(target, "GET", "/api/search?q=" + q);
+        await wait(70);
+      }
+      await wait(300);
+    }
   }
 };
 let uninstall = null;

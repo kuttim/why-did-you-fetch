@@ -56,7 +56,7 @@ interface Scenario {
   run(target: FakeTarget): Promise<void>;
 }
 
-const SCENARIOS: Record<'inflight' | 'recent' | 'chain', Scenario> = {
+const SCENARIOS: Record<'inflight' | 'recent' | 'chain' | 'rapid', Scenario> = {
   inflight: {
     label: 'Duplicate in-flight',
     desc: 'UserCard and Avatar mount at the same time and each independently fetch the same user — neither knows about the other.',
@@ -158,6 +158,39 @@ const SCENARIOS: Record<'inflight' | 'recent' | 'chain', Scenario> = {
       await logged(target, 'GET', '/api/profile');
       await logged(target, 'GET', '/api/notifications/count');
       await logged(target, 'GET', '/api/billing/status');
+    },
+  },
+  rapid: {
+    label: 'Rapid same-endpoint calls',
+    desc: 'SearchBox fires a new request on every keystroke with no debounce — five different queries to the same endpoint inside a second.',
+    latency: 180,
+    files: [
+      {
+        name: 'SearchBox.tsx',
+        code:
+          `function SearchBox() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (!query) return;
+    fetch(\`/api/search?q=` +
+          esc('query') +
+          `\`)
+      .then((r) => r.json())
+      .then((data) => setResults(data.results));
+  }, [query]); // fires on every keystroke — no debounce
+
+  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;
+}`,
+      },
+    ],
+    async run(target) {
+      for (const q of ['r', 're', 'rea', 'reac', 'react']) {
+        logged(target, 'GET', '/api/search?q=' + q);
+        await wait(70);
+      }
+      await wait(300);
     },
   },
 };
