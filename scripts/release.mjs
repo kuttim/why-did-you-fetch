@@ -9,7 +9,8 @@ import { createInterface } from 'node:readline/promises';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHANGELOG_PATH = join(ROOT, 'CHANGELOG.md');
 const PACKAGE_PATH = join(ROOT, 'package.json');
-const DEMO_PATH = join(ROOT, 'docs', 'index.html');
+const DEMO_HTML_PATH = join(ROOT, 'docs', 'index.html');
+const DEMO_TS_PATH = join(ROOT, 'docs', 'demo.ts');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -57,11 +58,13 @@ try {
   fail('npm is not authenticated — run `npm login` first.');
 }
 
-console.log('\n▸ Running lint, typecheck, tests, build…\n');
+console.log('\n▸ Running lint, format check, typecheck, tests, build…\n');
 run('npm run lint');
+run('npm run format:check');
 run('npm run typecheck');
 run('npm run test');
 run('npm run build');
+run('npm run build:demo');
 
 function resolveVersion(current, bump) {
   if (/^\d+\.\d+\.\d+$/.test(bump)) return bump;
@@ -153,11 +156,16 @@ const updatedChangelog =
 writeFileSync(CHANGELOG_PATH, updatedChangelog);
 run(`npm version ${nextVersion} --no-git-tag-version`);
 
-const demo = readFileSync(DEMO_PATH, 'utf8');
-const updatedDemo = demo
+const demoHtml = readFileSync(DEMO_HTML_PATH, 'utf8');
+const updatedDemoHtml = demoHtml
   .replace(/why-did-you-fetch@\d+\.\d+\.\d+/g, `why-did-you-fetch@${nextVersion}`)
   .replace(/(class="version-pill">v)\d+\.\d+\.\d+(<\/span>)/, `$1${nextVersion}$2`);
-writeFileSync(DEMO_PATH, updatedDemo);
+writeFileSync(DEMO_HTML_PATH, updatedDemoHtml);
+
+const demoTs = readFileSync(DEMO_TS_PATH, 'utf8');
+const updatedDemoTs = demoTs.replace(/why-did-you-fetch@\d+\.\d+\.\d+/g, `why-did-you-fetch@${nextVersion}`);
+writeFileSync(DEMO_TS_PATH, updatedDemoTs);
+run('npm run build:demo');
 
 if (!skipConfirm) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -169,7 +177,7 @@ if (!skipConfirm) {
   rl.close();
 }
 
-run('git add CHANGELOG.md package.json package-lock.json docs/index.html');
+run('git add CHANGELOG.md package.json package-lock.json docs/index.html docs/demo.ts docs/demo.js');
 run(`git commit -m "release: v${nextVersion}"`);
 
 // npm publish before anything GitHub-facing: if it fails (2FA prompt, registry hiccup), the

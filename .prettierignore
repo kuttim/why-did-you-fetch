@@ -4,5 +4,7 @@ coverage
 package-lock.json
 CHANGELOG.md
 
-# Hand-formatted; extracting/checking its inline script is a separate, bigger effort.
+# Hand-formatted.
 docs/index.html
+# Generated from docs/demo.ts via `npm run build:demo` — not hand-edited.
+docs/demo.js

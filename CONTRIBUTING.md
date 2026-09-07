@@ -22,6 +22,10 @@ npm run build
   clock) and, if it touches `patchFetch`/`patchXHR`, an integration test alongside the existing
   ones.
 - Run `npm run prepublishOnly` before opening a PR — it's the same check CI runs.
+- The live demo's logic lives in `docs/demo.ts` (linted and typechecked like everything in
+  `src/`) and is compiled to `docs/demo.js` via `npm run build:demo` — `docs/index.html` just
+  loads that file. If you change `docs/demo.ts`, run `npm run build:demo` and commit the
+  updated `docs/demo.js` too; CI fails if they drift apart.
 
 ## Reporting a bug
 
