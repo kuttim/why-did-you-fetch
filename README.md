@@ -8,12 +8,11 @@
 
 Monkey-patches `fetch` and `XMLHttpRequest` to warn you, in development, about network calls
 your app almost certainly didn't mean to make: **duplicate requests fired while an identical one
-is already in flight, identical requests repeated moments after the last one finished, and
-request waterfalls — requests fired one-after-another that could have been fired together.**
-
-It's the same idea as [`why-did-you-render`][wdyr] — instrument something ubiquitous, stay
-silent until there's something worth flagging, then print a clear, actionable console message
-with the call site — applied to the network tab instead of the render tree.
+is already in flight, identical requests repeated moments after the last one finished, request
+waterfalls that could have fired together, and unthrottled bursts like a search box refetching
+on every keystroke.** It's the same idea as [`why-did-you-render`][wdyr] — instrument something
+ubiquitous, stay silent until there's something worth flagging, then print a clear, actionable
+console message with the call site — applied to the network tab instead of the render tree.
 
 **[Try the live demo →](https://kuttim.github.io/why-did-you-fetch/)**
 No install required — it runs the real published package in your browser against a mock network
@@ -28,10 +27,11 @@ browser's real console._
 ## Why
 
 Two components independently `fetch`ing the same resource, a `useEffect` firing twice under
-StrictMode-like conditions, or three independent lookups awaited one at a time instead of via
-`Promise.all` — none of these throw, none of them show up in a type error, and all of them are
-easy to miss in a network tab with a hundred other requests in it. This library watches every
-`fetch`/`XHR` call as it happens and tells you the moment one of these patterns shows up.
+StrictMode-like conditions, three independent lookups awaited one at a time instead of via
+`Promise.all`, a search box firing a request on every keystroke with no debounce — none of these
+throw, none of them show up in a type error, and all of them are easy to miss in a network tab
+with a hundred other requests in it. This library watches every `fetch`/`XHR` call as it happens
+and tells you the moment one of these patterns shows up.
 
 ## Install
 
@@ -210,9 +210,8 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 
 ## Examples
 
-**[Live demo](https://kuttim.github.io/why-did-you-fetch/)** — no install required, runs in your
-browser against a mock network layer, with sample-project code for each detected pattern
-([source](./docs/demo.ts), [page](./docs/index.html)).
+**[Live demo](https://kuttim.github.io/why-did-you-fetch/)** (see the top of this README) —
+source at [`docs/demo.ts`](./docs/demo.ts) and [`docs/index.html`](./docs/index.html).
 
 Real, runnable integrations live in [`examples/`](./examples) — a zero-build vanilla page, a
 Vite + React project, and a Next.js App Router project (the one place `useWhyDidYouFetch()`'s
@@ -224,9 +223,8 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Credit
 
-Directly inspired by [`why-did-you-render`][wdyr] by Welldone Software — same idea
-(instrument something ubiquitous, stay quiet until there's something worth flagging), aimed at
-the network tab instead of the render tree.
+[`why-did-you-render`][wdyr] by Welldone Software came first and set the pattern this project
+follows (see the intro above). Worth a star in its own right if this one was useful to you.
 
 ## License
 
