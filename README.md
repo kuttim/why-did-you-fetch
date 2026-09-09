@@ -15,6 +15,11 @@ the same idea as [`why-did-you-render`][wdyr] — instrument something ubiquitou
 until there's something worth flagging, then print a clear, actionable console message with the
 call site — applied to the network tab instead of the render tree.
 
+**Built with React apps as the primary target** — these patterns show up hardest in component
+trees where no single place owns the whole data-fetching picture — but it patches `globalThis`
+directly, not React internals, so it works exactly the same way under Vue, Angular, Svelte, or no
+framework at all. See [Compatibility](#compatibility) for the full picture.
+
 **[Try the live demo →](https://kuttim.github.io/why-did-you-fetch/)**
 No install required — it runs the real published package in your browser against a mock network
 layer, with sample-project code for each detected pattern.
