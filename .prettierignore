@@ -3,6 +3,7 @@ dist
 coverage
 package-lock.json
 CHANGELOG.md
+.angular
 
 # Hand-formatted.
 docs/index.html

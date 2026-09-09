@@ -1,0 +1,4 @@
+# Angular-specific build artifacts not already covered by the root .gitignore
+# (node_modules/, dist/ are covered there).
+/.angular/cache
+/out-tsc

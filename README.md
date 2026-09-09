@@ -223,9 +223,10 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 **[Live demo](https://kuttim.github.io/why-did-you-fetch/)** (see the top of this README) —
 source at [`docs/demo.ts`](./docs/demo.ts) and [`docs/index.html`](./docs/index.html).
 
-Real, runnable integrations live in [`examples/`](./examples) — a zero-build vanilla page, a
-Vite + React project, and a Next.js App Router project (the one place `useWhyDidYouFetch()`'s
-SSR-safety and effect-ordering behavior actually matters — see its README for why).
+Real, runnable integrations live in [`examples/`](./examples) — a zero-build vanilla page, Vite +
+React, Vue, Svelte, Angular, and a Next.js App Router project (the one place
+`useWhyDidYouFetch()`'s SSR-safety and effect-ordering behavior actually matters — see its README
+for why).
 
 ## Contributing
 
