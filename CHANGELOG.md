@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-09-09
+
+### Added
+
+- Add n-plus-one detector for parallel list-fetch storms
+
+### Changed
+
+- Add Vue, Angular, and Svelte
+- Frame React as the primary target, add react keyword
+- Fix duplicate wdyr credit line, missing rapid-calls in intro
+- Add FUNDING.yml (GitHub Sponsors, Ko-fi)
+- Add GitHub social preview image
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
