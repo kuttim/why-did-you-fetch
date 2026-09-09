@@ -70,7 +70,19 @@ export interface RapidCallsIssue extends IssueBase {
   windowMs: number;
 }
 
-export type Issue = DuplicateInflightIssue | DuplicateRecentIssue | SequentialChainIssue | RapidCallsIssue;
+export interface NPlusOneIssue extends IssueBase {
+  kind: 'n-plus-one';
+  method: string;
+  /** The shared route shape, id-like segments collapsed to `:id` — e.g. `/api/users/:id`. */
+  pathTemplate: string;
+  /** The calls that make up this burst, oldest first — each hits a different concrete URL. */
+  requests: TrackedRequest[];
+  /** Wall-clock span from the first call in the burst to the one that crossed the threshold. */
+  windowMs: number;
+}
+
+export type Issue =
+  DuplicateInflightIssue | DuplicateRecentIssue | SequentialChainIssue | RapidCallsIssue | NPlusOneIssue;
 
 export type IgnoreMatcher = string | RegExp | ((url: string, method: string) => boolean);
 
@@ -127,6 +139,17 @@ export interface WdyfOptions {
   rapidCallWindowMs?: number;
   /** How many calls within `rapidCallWindowMs` trigger the `rapid-calls` detector. Default: 5. */
   rapidCallMinCount?: number;
+  /**
+   * Rolling window (ms) for the `n-plus-one` detector: this many calls to the same method +
+   * route shape (id-like path segments collapsed, e.g. `/api/users/:id`) within this window —
+   * each to a *different* concrete URL, so it doesn't overlap with `rapid-calls` — is reported
+   * as likely "N+1": a list rendering many rows that each fetch their own record instead of one
+   * batched request. Default: 500 (tighter than `rapidCallWindowMs`, since a render pass's
+   * fetches typically fire within the same tick, not spread out like keystrokes).
+   */
+  nPlusOneWindowMs?: number;
+  /** How many distinct-URL calls within `nPlusOneWindowMs` trigger the `n-plus-one` detector. Default: 5. */
+  nPlusOneMinCount?: number;
   /**
    * Skip requests made with `fetch(url, { keepalive: true })` — analytics/beacon calls fired on
    * page unload are usually intentional and repetitive by design. XHR has no equivalent flag.

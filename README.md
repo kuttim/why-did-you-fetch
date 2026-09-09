@@ -9,10 +9,11 @@
 Monkey-patches `fetch` and `XMLHttpRequest` to warn you, in development, about network calls
 your app almost certainly didn't mean to make: **duplicate requests fired while an identical one
 is already in flight, identical requests repeated moments after the last one finished, request
-waterfalls that could have fired together, and unthrottled bursts like a search box refetching
-on every keystroke.** It's the same idea as [`why-did-you-render`][wdyr] — instrument something
-ubiquitous, stay silent until there's something worth flagging, then print a clear, actionable
-console message with the call site — applied to the network tab instead of the render tree.
+waterfalls that could have fired together, unthrottled bursts like a search box refetching on
+every keystroke, and N+1-style storms where a list fetches each row's data individually.** It's
+the same idea as [`why-did-you-render`][wdyr] — instrument something ubiquitous, stay silent
+until there's something worth flagging, then print a clear, actionable console message with the
+call site — applied to the network tab instead of the render tree.
 
 **[Try the live demo →](https://kuttim.github.io/why-did-you-fetch/)**
 No install required — it runs the real published package in your browser against a mock network
@@ -28,10 +29,11 @@ browser's real console._
 
 Two components independently `fetch`ing the same resource, a `useEffect` firing twice under
 StrictMode-like conditions, three independent lookups awaited one at a time instead of via
-`Promise.all`, a search box firing a request on every keystroke with no debounce — none of these
-throw, none of them show up in a type error, and all of them are easy to miss in a network tab
-with a hundred other requests in it. This library watches every `fetch`/`XHR` call as it happens
-and tells you the moment one of these patterns shows up.
+`Promise.all`, a search box firing a request on every keystroke with no debounce, a table of 50
+rows each fetching its own record instead of one batched call — none of these throw, none of
+them show up in a type error, and all of them are easy to miss in a network tab with a hundred
+other requests in it. This library watches every `fetch`/`XHR` call as it happens and tells you
+the moment one of these patterns shows up.
 
 ## Install
 
@@ -83,12 +85,13 @@ function App() {
 
 ## What it detects
 
-| Detector             | Fires when                                                                                                                                                                                        | Confidence                                                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                                                                                                   | High — this is almost always accidental.                                                                                                                                                      |
-| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.                                                                                             | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
-| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting — a request waterfall.                                                              | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
-| `rapid-calls`        | Several requests (default 5+) to the same path — each with a _different_ query string — fire within a short window (default 1s). The classic shape is a search box refetching on every keystroke. | **Heuristic.** Disjoint from the two duplicate detectors above (it requires at least two distinct signatures in the burst), so it won't double-report an exact-duplicate storm.               |
+| Detector             | Fires when                                                                                                                                                                                                                                                                                     | Confidence                                                                                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate-inflight` | The exact same request (method + URL + body) is issued again before the first call has settled.                                                                                                                                                                                                | High — this is almost always accidental.                                                                                                                                                      |
+| `duplicate-recent`   | The exact same request is issued again shortly (default 2s) after an identical call already finished.                                                                                                                                                                                          | High, but tune `dedupeWindowMs` for endpoints that are meant to be polled.                                                                                                                    |
+| `sequential-chain`   | Several requests (default 3+) fire back-to-back with almost no gap between one settling and the next starting — a request waterfall.                                                                                                                                                           | **Heuristic.** This flags the _pattern_ of serialization, not a proven dependency problem — it's a prompt to go check whether `Promise.all` would work, not a claim that it definitely would. |
+| `rapid-calls`        | Several requests (default 5+) to the same path — each with a _different_ query string — fire within a short window (default 1s). The classic shape is a search box refetching on every keystroke.                                                                                              | **Heuristic.** Disjoint from the two duplicate detectors above (it requires at least two distinct signatures in the burst), so it won't double-report an exact-duplicate storm.               |
+| `n-plus-one`         | Several requests (default 5+) to the same route _shape_ — id-like path segments collapsed, e.g. `/api/users/:id` — each to a _different_ concrete URL, fire within a short window (default 500ms). A list rendering many rows that each fetch their own record instead of one batched request. | **Heuristic.** Requires distinct concrete URLs, so it won't double-report a `rapid-calls` burst (same path, varying query) or a `duplicate-*` storm (same URL repeated).                      |
 
 Each issue is delivered with the call stack(s) involved, so you can jump straight to the
 offending code — the default console reporter prints them as a collapsed, color-coded group.
@@ -137,6 +140,8 @@ init({
   chainMinLength: 3, // how many chained requests before it's reported
   rapidCallWindowMs: 1000, // rolling window for the rapid-calls detector
   rapidCallMinCount: 5, // how many varying-query calls within that window trigger it
+  nPlusOneWindowMs: 500, // rolling window for the n-plus-one detector
+  nPlusOneMinCount: 5, // how many distinct-URL calls to the same route shape trigger it
   retainMs: 5000, // how long settled requests are remembered for comparison
   maxInflightAgeMs: 60000, // stop tracking a request that never settles after this long
   ignoreKeepalive: true, // skip fetch(url, { keepalive: true }) beacons/analytics calls

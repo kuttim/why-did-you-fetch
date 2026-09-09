@@ -8,18 +8,21 @@ const LABEL: Record<Issue['kind'], string> = {
   'duplicate-recent': 'DUPLICATE · RECENT',
   'sequential-chain': 'SEQUENTIAL CHAIN',
   'rapid-calls': 'RAPID CALLS',
+  'n-plus-one': 'N+1',
 };
 const BADGE_STYLE: Record<Issue['kind'], string> = {
   'duplicate-inflight': 'background:#e11d48;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
   'duplicate-recent': 'background:#d97706;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
   'sequential-chain': 'background:#2563eb;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
   'rapid-calls': 'background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
+  'n-plus-one': 'background:#059669;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
 };
 const SEV_CLASS: Record<Issue['kind'], string> = {
   'duplicate-inflight': 'a',
   'duplicate-recent': 'b',
   'sequential-chain': 'c',
   'rapid-calls': 'd',
+  'n-plus-one': 'e',
 };
 
 const els = {
@@ -56,7 +59,7 @@ interface Scenario {
   run(target: FakeTarget): Promise<void>;
 }
 
-const SCENARIOS: Record<'inflight' | 'recent' | 'chain' | 'rapid', Scenario> = {
+const SCENARIOS: Record<'inflight' | 'recent' | 'chain' | 'rapid' | 'nplusone', Scenario> = {
   inflight: {
     label: 'Duplicate in-flight',
     desc: 'UserCard and Avatar mount at the same time and each independently fetch the same user — neither knows about the other.',
@@ -189,6 +192,51 @@ const SCENARIOS: Record<'inflight' | 'recent' | 'chain' | 'rapid', Scenario> = {
       for (const q of ['r', 're', 'rea', 'reac', 'react']) {
         logged(target, 'GET', '/api/search?q=' + q);
         await wait(70);
+      }
+      await wait(300);
+    },
+  },
+  nplusone: {
+    label: 'N+1 list fetch',
+    desc: 'UserList renders five rows, each fetching its own user record on mount instead of one batched request.',
+    latency: 200,
+    files: [
+      {
+        name: 'UserList.tsx',
+        code:
+          `function UserList({ ids }) {
+  return (
+    <ul>
+      {ids.map((id) => (
+        <UserRow key={id} id={id} />
+      ))}
+    </ul>
+  );
+}
+
+function UserRow({ id }) {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Each row fetches its own record — five ids means five requests,
+    // instead of one GET /api/users?ids=` +
+          esc('ids.join(",")') +
+          `
+    fetch(\`/api/users/` +
+          esc('id') +
+          `\`)
+      .then((r) => r.json())
+      .then(setUser);
+  }, [id]);
+
+  return <li>{user?.name ?? 'Loading…'}</li>;
+}`,
+      },
+    ],
+    async run(target) {
+      for (const id of [1, 2, 3, 4, 5]) {
+        logged(target, 'GET', '/api/users/' + id);
+        await wait(15);
       }
       await wait(300);
     },

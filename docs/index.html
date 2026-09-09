@@ -33,6 +33,7 @@
     --sev-b: #d97706; /* duplicate-recent */
     --sev-c: #2563eb; /* sequential-chain */
     --sev-d: #7c3aed; /* rapid-calls */
+    --sev-e: #059669; /* n-plus-one */
     --sev-ink: #ffffff;
 
     /* fixed "terminal chrome" tokens — the network/console panels stay dark
@@ -415,6 +416,8 @@
   .issue.sev-c .badge { background: var(--sev-c); }
   .issue.sev-d { --sev-border: var(--sev-d); }
   .issue.sev-d .badge { background: var(--sev-d); }
+  .issue.sev-e { --sev-border: var(--sev-e); }
+  .issue.sev-e .badge { background: var(--sev-e); }
   .issue p {
     color: var(--term-ink);
     font-family: var(--font-sans);
@@ -603,6 +606,7 @@
       <button class="tab" data-scenario="recent" role="tab">Duplicate, moments later</button>
       <button class="tab" data-scenario="chain" role="tab">Sequential chain</button>
       <button class="tab" data-scenario="rapid" role="tab">Rapid same-endpoint calls</button>
+      <button class="tab" data-scenario="nplusone" role="tab">N+1 list fetch</button>
     </div>
 
     <p class="scenario-desc"></p>
@@ -635,7 +639,7 @@
 
   <section class="detectors">
     <h2>What it catches</h2>
-    <p class="section-sub">Four detectors, run on every patched request. The first two are near-certain; the other two name an observable pattern, not a proven dependency.</p>
+    <p class="section-sub">Five detectors, run on every patched request. The first two are near-certain; the other three name an observable pattern, not a proven dependency.</p>
     <div class="table-wrap">
       <table>
         <thead>
@@ -660,6 +664,11 @@
           <tr>
             <td><span class="kind-dot" style="background:var(--sev-d)"></span><code>rapid-calls</code></td>
             <td>5+ calls to the same path with a different query string each time fire within 1s — a search box refetching on every keystroke.</td>
+            <td><span class="confidence-pill heuristic">heuristic</span></td>
+          </tr>
+          <tr>
+            <td><span class="kind-dot" style="background:var(--sev-e)"></span><code>n-plus-one</code></td>
+            <td>5+ calls to the same route shape (id-like segments collapsed, e.g. <code>/api/users/:id</code>) each to a different URL fire within 500ms — a list fetching each row's data individually.</td>
             <td><span class="confidence-pill heuristic">heuristic</span></td>
           </tr>
         </tbody>
@@ -693,6 +702,8 @@
           <tr><td><code>chainMinLength</code></td><td>3</td><td>Chain length before it's reported.</td></tr>
           <tr><td><code>rapidCallWindowMs</code></td><td>1000</td><td>Rolling window for the rapid-calls detector.</td></tr>
           <tr><td><code>rapidCallMinCount</code></td><td>5</td><td>Varying-query calls within that window before it's reported.</td></tr>
+          <tr><td><code>nPlusOneWindowMs</code></td><td>500</td><td>Rolling window for the n-plus-one detector.</td></tr>
+          <tr><td><code>nPlusOneMinCount</code></td><td>5</td><td>Distinct-URL calls to the same route shape within that window before it's reported.</td></tr>
           <tr><td><code>maxInflightAgeMs</code></td><td>60000</td><td>Stop tracking a request that never settles after this long.</td></tr>
           <tr><td><code>ignoreKeepalive</code></td><td><code>true</code></td><td>Skip <code>fetch(url, &#123; keepalive: true &#125;)</code> beacon/analytics calls.</td></tr>
           <tr><td><code>ignore</code></td><td><code>[]</code></td><td>Strings, RegExps, or predicates to skip (analytics beacons, etc).</td></tr>

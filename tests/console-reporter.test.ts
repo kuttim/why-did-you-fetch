@@ -3,6 +3,7 @@ import { consoleReporter } from '../src/reporter/console.js';
 import type {
   DuplicateInflightIssue,
   DuplicateRecentIssue,
+  NPlusOneIssue,
   RapidCallsIssue,
   SequentialChainIssue,
   TrackedRequest,
@@ -118,6 +119,30 @@ describe('consoleReporter', () => {
     expect(log).toHaveBeenCalledWith('stack-a');
     expect(log).toHaveBeenCalledWith('2. /search?q=ab');
     expect(log).toHaveBeenCalledWith('stack-ab');
+  });
+
+  it('logs each request in an n-plus-one issue', () => {
+    vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    const issue: NPlusOneIssue = {
+      kind: 'n-plus-one',
+      method: 'GET',
+      pathTemplate: '/api/users/:id',
+      requests: [
+        makeRequest({ url: '/api/users/1', stack: 'stack-1' }),
+        makeRequest({ url: '/api/users/2', stack: 'stack-2' }),
+      ],
+      windowMs: 40,
+      message: '2 requests to different GET /api/users/:id URLs fired within 40ms',
+    };
+    consoleReporter(issue);
+
+    expect(log).toHaveBeenCalledWith('1. /api/users/1');
+    expect(log).toHaveBeenCalledWith('stack-1');
+    expect(log).toHaveBeenCalledWith('2. /api/users/2');
+    expect(log).toHaveBeenCalledWith('stack-2');
   });
 
   it('falls back to console.log when console.groupCollapsed is unavailable', () => {

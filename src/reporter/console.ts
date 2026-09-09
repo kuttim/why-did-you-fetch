@@ -5,6 +5,7 @@ const BADGE_STYLE: Record<Issue['kind'], string> = {
   'duplicate-recent': 'background:#d97706;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
   'sequential-chain': 'background:#2563eb;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
   'rapid-calls': 'background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
+  'n-plus-one': 'background:#059669;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
 };
 
 const LABEL: Record<Issue['kind'], string> = {
@@ -12,6 +13,7 @@ const LABEL: Record<Issue['kind'], string> = {
   'duplicate-recent': 'DUPLICATE (recent)',
   'sequential-chain': 'SEQUENTIAL CHAIN',
   'rapid-calls': 'RAPID CALLS',
+  'n-plus-one': 'N+1',
 };
 
 /**
@@ -44,6 +46,7 @@ export function consoleReporter(issue: Issue): void {
       });
       break;
     case 'rapid-calls':
+    case 'n-plus-one':
       issue.requests.forEach((req, i) => {
         console.log(`${i + 1}. ${req.url}`);
         console.log(req.stack);

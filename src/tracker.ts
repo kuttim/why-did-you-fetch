@@ -1,5 +1,5 @@
 import { describeCacheFreshness } from './utils/cacheFreshness.js';
-import { stripQueryAndHash } from './utils/path.js';
+import { stripQueryAndHash, templatePath } from './utils/path.js';
 import type { Issue, RequestKind, ResolvedWdyfOptions, TrackedRequest } from './types.js';
 
 export interface StartParams {
@@ -21,6 +21,8 @@ type TrackerOptions = Pick<
   | 'maxInflightAgeMs'
   | 'rapidCallWindowMs'
   | 'rapidCallMinCount'
+  | 'nPlusOneWindowMs'
+  | 'nPlusOneMinCount'
 >;
 
 interface RapidCallBucket {
@@ -28,11 +30,16 @@ interface RapidCallBucket {
   lastReportedAt: number | null;
 }
 
+interface NPlusOneBucket {
+  requests: TrackedRequest[];
+  lastReportedAt: number | null;
+}
+
 /**
- * Holds everything we know about in-flight and recently-settled requests, and runs the four
- * detectors (in-flight duplicate, recent duplicate, sequential chain, rapid calls) as requests
- * start and settle. Framework/transport agnostic — patchFetch and patchXHR both feed it the same
- * shape.
+ * Holds everything we know about in-flight and recently-settled requests, and runs the five
+ * detectors (in-flight duplicate, recent duplicate, sequential chain, rapid calls, n-plus-one)
+ * as requests start and settle. Framework/transport agnostic — patchFetch and patchXHR both feed
+ * it the same shape.
  */
 export class RequestTracker {
   private nextId = 1;
@@ -43,6 +50,7 @@ export class RequestTracker {
   private chains = new Map<number, TrackedRequest[]>();
   private reportedChains = new Set<number>();
   private rapidCalls = new Map<string, RapidCallBucket>();
+  private nPlusOne = new Map<string, NPlusOneBucket>();
 
   constructor(
     private options: TrackerOptions,
@@ -73,6 +81,7 @@ export class RequestTracker {
     this.checkRecentDuplicate(request, now);
     this.assignChain(request, now);
     this.checkRapidCalls(request, now);
+    this.checkNPlusOne(request, now);
 
     const bucket = this.inflight.get(request.signature) ?? [];
     bucket.push(request);
@@ -198,6 +207,44 @@ export class RequestTracker {
   }
 
   /**
+   * Flags a burst of calls to the same method + route *shape* (id-like path segments collapsed
+   * to `:id`) that each hit a *different* concrete URL — the "list of rows, each fetching its
+   * own record" pattern, aka N+1. Disjoint from rapid-calls: that one requires the exact same
+   * path (only the query varies); this one requires the path itself to differ while still
+   * sharing a template, so a rapid-calls burst (same path, varying query) never also counts here.
+   */
+  private checkNPlusOne(request: TrackedRequest, now: number): void {
+    const path = stripQueryAndHash(request.url);
+    const key = `${request.method} ${templatePath(path)}`;
+    const bucket = this.nPlusOne.get(key) ?? { requests: [], lastReportedAt: null };
+    bucket.requests = bucket.requests.filter((r) => now - r.startedAt <= this.options.nPlusOneWindowMs);
+    bucket.requests.push(request);
+    this.nPlusOne.set(key, bucket);
+
+    // Distinct concrete paths, not just distinct requests — requiring this many genuinely
+    // different records (not the same one re-fetched) is what separates this from noise.
+    const distinctPaths = new Set(bucket.requests.map((r) => stripQueryAndHash(r.url))).size;
+    const cooling = bucket.lastReportedAt != null && now - bucket.lastReportedAt <= this.options.nPlusOneWindowMs;
+
+    if (distinctPaths >= this.options.nPlusOneMinCount && !cooling) {
+      bucket.lastReportedAt = now;
+      const first = bucket.requests[0]!;
+      const windowMs = now - first.startedAt;
+      const pathTemplate = templatePath(path);
+      this.emit({
+        kind: 'n-plus-one',
+        method: request.method,
+        pathTemplate,
+        requests: bucket.requests.slice(),
+        windowMs,
+        message: `${distinctPaths} requests to different ${request.method} ${pathTemplate} URLs fired within ${Math.round(
+          windowMs,
+        )}ms of each other — looks like a list rendering each fetching its own record. Consider a single batched request instead.`,
+      });
+    }
+  }
+
+  /**
    * A request that never settles — a hung connection, one swallowed by a service worker —
    * would otherwise sit in `inflight` forever, leaking memory and permanently flagging every
    * future identical request as a duplicate. If it does eventually settle, `settle()` no-ops
@@ -230,6 +277,12 @@ export class RequestTracker {
       const last = bucket.requests[bucket.requests.length - 1];
       if (!last || now - last.startedAt > this.options.retainMs) {
         this.rapidCalls.delete(key);
+      }
+    }
+    for (const [key, bucket] of this.nPlusOne) {
+      const last = bucket.requests[bucket.requests.length - 1];
+      if (!last || now - last.startedAt > this.options.retainMs) {
+        this.nPlusOne.delete(key);
       }
     }
   }

@@ -9,6 +9,7 @@ export type {
   DuplicateRecentIssue,
   Issue,
   IgnoreMatcher,
+  NPlusOneIssue,
   RapidCallsIssue,
   RequestKind,
   RequestStatus,
@@ -40,6 +41,8 @@ function resolveOptions(options: WdyfOptions): ResolvedWdyfOptions {
     maxInflightAgeMs: options.maxInflightAgeMs ?? 60000,
     rapidCallWindowMs: options.rapidCallWindowMs ?? 1000,
     rapidCallMinCount: options.rapidCallMinCount ?? 5,
+    nPlusOneWindowMs: options.nPlusOneWindowMs ?? 500,
+    nPlusOneMinCount: options.nPlusOneMinCount ?? 5,
     ignoreKeepalive: options.ignoreKeepalive ?? true,
     normalizeBody: options.normalizeBody ?? ((body: unknown) => body),
   };

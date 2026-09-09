@@ -10,6 +10,8 @@ const OPTIONS = {
   maxInflightAgeMs: 60000,
   rapidCallWindowMs: 1000,
   rapidCallMinCount: 5,
+  nPlusOneWindowMs: 500,
+  nPlusOneMinCount: 5,
 };
 
 function makeClock(start = 0) {
@@ -262,5 +264,66 @@ describe('RequestTracker', () => {
       clock.advance(50);
     }
     expect(issues.filter((i) => i.kind === 'rapid-calls')).toHaveLength(2);
+  });
+
+  it('flags a burst of parallel requests to the same route shape with different ids', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 1; i <= OPTIONS.nPlusOneMinCount; i++) {
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/api/users/${i}`,
+        signature: `GET /api/users/${i}`,
+        stack: () => 's',
+      });
+      clock.advance(5);
+    }
+
+    const nPlusOne = issues.filter((i) => i.kind === 'n-plus-one');
+    expect(nPlusOne).toHaveLength(1);
+    expect(nPlusOne[0]?.kind === 'n-plus-one' && nPlusOne[0].pathTemplate).toBe('/api/users/:id');
+  });
+
+  it('does not flag a rapid-calls burst (same path, varying query) as n-plus-one', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 0; i < OPTIONS.rapidCallMinCount; i++) {
+      tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: `/search?q=${i}`,
+        signature: `GET /search?q=${i}`,
+        stack: () => 's',
+      });
+      clock.advance(5);
+    }
+
+    expect(issues.filter((i) => i.kind === 'rapid-calls')).toHaveLength(1);
+    expect(issues.filter((i) => i.kind === 'n-plus-one')).toHaveLength(0);
+  });
+
+  it('does not flag repeated calls to the same id as n-plus-one (that is duplicate territory)', () => {
+    const clock = makeClock();
+    const issues: Issue[] = [];
+    const tracker = new RequestTracker(OPTIONS, (i) => issues.push(i), clock.fn);
+
+    for (let i = 0; i < OPTIONS.nPlusOneMinCount + 2; i++) {
+      const req = tracker.start({
+        kind: 'fetch',
+        method: 'GET',
+        url: '/api/users/1',
+        signature: 'GET /api/users/1',
+        stack: () => 's',
+      });
+      tracker.settle(req, 'resolved');
+      clock.advance(5);
+    }
+
+    expect(issues.filter((i) => i.kind === 'n-plus-one')).toHaveLength(0);
   });
 });
