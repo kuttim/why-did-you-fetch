@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-09-10
+
+### Added
+
+- Add collectIssues() for CI/test assertions
+
+### Changed
+
+- Add Cypress CI-check for collectIssues()
+- Bump stale why-did-you-fetch pins to 0.7.0
+- Drop unnecessary .js extensions from internal imports
+
 ## [0.7.0] - 2026-09-10
 
 ### Changed
