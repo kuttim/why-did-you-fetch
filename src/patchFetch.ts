@@ -1,7 +1,9 @@
 import { shouldIgnore } from './ignore.js';
 import { buildSignature, hashBody } from './signature.js';
 import type { RequestTracker } from './tracker.js';
+import type { TrackedRequest } from './types.js';
 import type { ResolvedWdyfOptions } from './types.js';
+import { reportInternalError } from './utils/internalError.js';
 import { captureStack } from './utils/stack.js';
 
 type FetchFn = typeof fetch;
@@ -44,22 +46,42 @@ export function patchFetch(
   if (typeof original !== 'function') return () => {};
 
   const patched: FetchFn = function patchedFetch(input, init) {
-    const { method, url } = extractMethodAndUrl(input, init);
-
-    if (shouldIgnore(url, method, options.ignore) || (options.ignoreKeepalive && isKeepalive(input, init))) {
-      return original.call(target, input, init);
+    // A bug here (ours, or in a user-supplied ignore/normalizeUrl/normalizeBody callback) must
+    // never take the real fetch call down with it — instrumentation is best-effort, wrapped
+    // separately from the real call below, which always happens regardless.
+    let tracked: TrackedRequest | null = null;
+    try {
+      const { method, url } = extractMethodAndUrl(input, init);
+      if (!(shouldIgnore(url, method, options.ignore) || (options.ignoreKeepalive && isKeepalive(input, init)))) {
+        const stack = captureStack();
+        const bodyHash = hashBody(options.normalizeBody(extractBody(input, init)));
+        const signature = buildSignature(method, options.normalizeUrl(url), bodyHash);
+        tracked = tracker.start({ kind: 'fetch', method, url, signature, stack });
+      }
+    } catch (error) {
+      reportInternalError('patchFetch', error);
     }
 
-    const stack = captureStack();
-    const bodyHash = hashBody(options.normalizeBody(extractBody(input, init)));
-    const signature = buildSignature(method, options.normalizeUrl(url), bodyHash);
-    const tracked = tracker.start({ kind: 'fetch', method, url, signature, stack });
-
     const result = original.call(target, input, init);
-    result.then(
-      (res) => tracker.settle(tracked, res.ok ? 'resolved' : 'rejected', res.headers.get('cache-control')),
-      () => tracker.settle(tracked, 'rejected'),
-    );
+    if (tracked) {
+      const request = tracked;
+      result.then(
+        (res) => {
+          try {
+            tracker.settle(request, res.ok ? 'resolved' : 'rejected', res.headers.get('cache-control'));
+          } catch (error) {
+            reportInternalError('patchFetch (settle)', error);
+          }
+        },
+        () => {
+          try {
+            tracker.settle(request, 'rejected');
+          } catch (error) {
+            reportInternalError('patchFetch (settle)', error);
+          }
+        },
+      );
+    }
     return result;
   };
 

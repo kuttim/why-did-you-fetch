@@ -215,4 +215,52 @@ describe('init() with fetch', () => {
     expect(dup?.message).toContain('cacheable for 60s');
     uninstall();
   });
+
+  it('still makes the real call and resolves it when a user callback throws during instrumentation', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const originalFetchMock = target.fetch;
+    const uninstall = init(
+      {
+        enabled: true,
+        normalizeUrl: () => {
+          throw new Error('boom');
+        },
+      },
+      target,
+    );
+
+    const res = await target.fetch('/users/1');
+
+    expect(res.status).toBe(200);
+    expect(originalFetchMock).toHaveBeenCalledWith('/users/1', undefined);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError.mock.calls[0]?.[0]).toContain('why-did-you-fetch error in patchFetch');
+    uninstall();
+  });
+
+  it('still resolves the real call when onIssue throws while settling', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const target = fakeTarget(() => Promise.resolve(new Response('ok')));
+    const uninstall = init(
+      {
+        enabled: true,
+        onIssue: () => {
+          throw new Error('boom');
+        },
+      },
+      target,
+    );
+
+    // Fires duplicate-inflight -> onIssue -> throws, synchronously inside tracker.start(), which
+    // patchFetch's outer try/catch must contain without ever affecting the real calls below.
+    const p1 = target.fetch('/users/1');
+    const p2 = target.fetch('/users/1');
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(consoleError).toHaveBeenCalled();
+    uninstall();
+  });
 });

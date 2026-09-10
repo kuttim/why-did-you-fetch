@@ -179,6 +179,10 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 
 - **This is a development tool.** It adds bookkeeping overhead to every network call; leave
   `enabled` at its default so it's compiled out of / skipped in production.
+- **A bug in the library's own instrumentation never breaks your real request.** If something
+  throws while tracking a call — a bug here, or in a `ignore`/`normalizeUrl`/`normalizeBody`/
+  `onIssue` callback you supplied — it's caught, logged via `console.error` with a pointer to file
+  an issue, and the actual `fetch`/`XHR` call proceeds exactly as if `init()` had never run.
 - **Data-fetching libraries that already dedupe** (React Query, SWR, Apollo, RTK Query, ...)
   won't produce `duplicate-*` warnings for the requests they manage themselves, since they don't
   re-issue an in-flight request in the first place — that's the point of using them. This

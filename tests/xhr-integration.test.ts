@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { init } from '../src/index.js';
 import type { Issue } from '../src/types.js';
 
@@ -135,6 +135,33 @@ describe('init() with XMLHttpRequest', () => {
     (b as unknown as XMLHttpRequest).send();
 
     expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
+    uninstall();
+  });
+
+  it('still sends and settles the real request when a user callback throws during instrumentation', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const target = fakeTarget();
+    const uninstall = init(
+      {
+        enabled: true,
+        patch: ['xhr'],
+        normalizeUrl: () => {
+          throw new Error('boom');
+        },
+      },
+      target,
+    );
+
+    const xhr = new target.XMLHttpRequest() as unknown as FakeXHR;
+    const raw = xhr as unknown as XMLHttpRequest;
+    raw.open('GET', '/users/1');
+    const settled = settle(xhr);
+    raw.send();
+    await settled;
+
+    expect(xhr.status).toBe(200);
+    expect(consoleError).toHaveBeenCalled();
+    expect(consoleError.mock.calls[0]?.[0]).toContain('why-did-you-fetch error in patchXHR (send)');
     uninstall();
   });
 });
