@@ -31,6 +31,13 @@ describe('shouldIgnore', () => {
     expect(shouldIgnore('/anything', 'GET', [])).toBe(false);
   });
 
+  it('matches every call with a global/sticky RegExp, not just every other one', () => {
+    const matcher = /\/health-?check/gi;
+    for (let i = 0; i < 4; i++) {
+      expect(shouldIgnore('/health-check', 'GET', [matcher])).toBe(true);
+    }
+  });
+
   it('matches if any matcher in a mixed list matches', () => {
     const matchers = ['/analytics', /\/health-?check/i, (url: string) => url === '/exact'];
     expect(shouldIgnore('/exact', 'GET', matchers)).toBe(true);
