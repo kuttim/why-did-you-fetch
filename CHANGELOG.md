@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-09-10
+
+### Changed
+
+- Add .gitattributes to force LF line endings
+- Never let our own bugs break the real request
+
+### Fixed
+
+- Reset RegExp lastIndex before testing in shouldIgnore
+
 ## [0.6.0] - 2026-09-09
 
 ### Added
