@@ -1,8 +1,8 @@
-import { consoleReporter } from './reporter/console.js';
-import { patchFetch } from './patchFetch.js';
-import { patchXHR } from './patchXHR.js';
-import { RequestTracker } from './tracker.js';
-import type { Issue, ResolvedWdyfOptions, WdyfOptions } from './types.js';
+import { consoleReporter } from './reporter/console';
+import { patchFetch } from './patchFetch';
+import { patchXHR } from './patchXHR';
+import { RequestTracker } from './tracker';
+import type { Issue, ResolvedWdyfOptions, WdyfOptions } from './types';
 
 export type {
   DuplicateInflightIssue,
@@ -16,7 +16,8 @@ export type {
   SequentialChainIssue,
   TrackedRequest,
   WdyfOptions,
-} from './types.js';
+} from './types';
+export { consoleReporter } from './reporter/console';
 
 function defaultEnabled(): boolean {
   try {
@@ -76,4 +77,34 @@ export function init(options: WdyfOptions = {}, target: typeof globalThis = glob
   return () => {
     for (const uninstall of uninstallers) uninstall();
   };
+}
+
+export interface IssueCollector {
+  /** Every issue detected since collectIssues() was called. Mutated in place as new ones arrive. */
+  issues: Issue[];
+  /** Restores the original fetch/XHR — same as init()'s own return value. */
+  uninstall: () => void;
+}
+
+/**
+ * Same as `init()`, but collects every detected issue into an array you can assert on, instead
+ * of (only) printing them — for asserting network hygiene in a test, e.g.
+ * `expect(issues).toHaveLength(0)` at the end of a Cypress/Playwright/Jest run. Doesn't silently
+ * drop your own `onIssue` if you pass one — it still runs, right after the issue is collected.
+ * See `examples/cypress-ci-check` for a full CI-enforced example.
+ */
+export function collectIssues(options: WdyfOptions = {}, target: typeof globalThis = globalThis): IssueCollector {
+  const issues: Issue[] = [];
+  const userOnIssue = options.onIssue;
+  const uninstall = init(
+    {
+      ...options,
+      onIssue: (issue) => {
+        issues.push(issue);
+        userOnIssue?.(issue);
+      },
+    },
+    target,
+  );
+  return { issues, uninstall };
 }
