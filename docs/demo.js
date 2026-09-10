@@ -1,5 +1,12 @@
 import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js";
-const DEMO_OPTIONS = { dedupeWindowMs: 1500, chainGapMs: 50, chainMinLength: 3, retainMs: 5e3 };
+const DEMO_OPTIONS = {
+  dedupeWindowMs: 1500,
+  chainGapMs: 50,
+  chainMinLength: 3,
+  retainMs: 5e3,
+  rapidCallWindowMs: 1e4,
+  nPlusOneWindowMs: 1e4
+};
 const LABEL = {
   "duplicate-inflight": "DUPLICATE \xB7 IN-FLIGHT",
   "duplicate-recent": "DUPLICATE \xB7 RECENT",

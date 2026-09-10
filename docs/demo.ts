@@ -1,7 +1,18 @@
 import { init } from 'https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js';
 import type { Issue } from 'https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js';
 
-const DEMO_OPTIONS = { dedupeWindowMs: 1500, chainGapMs: 50, chainMinLength: 3, retainMs: 5000 };
+// nPlusOneWindowMs and rapidCallWindowMs are widened well past their real defaults (500ms/1000ms)
+// for the same reason dedupeWindowMs/chainGapMs already are: this demo's scripted timing has to
+// survive real-world jank — a slow device, a backgrounded tab throttling setTimeout, whatever —
+// on a visitor's actual machine, not just a clean local run.
+const DEMO_OPTIONS = {
+  dedupeWindowMs: 1500,
+  chainGapMs: 50,
+  chainMinLength: 3,
+  retainMs: 5000,
+  rapidCallWindowMs: 10000,
+  nPlusOneWindowMs: 10000,
+};
 
 const LABEL: Record<Issue['kind'], string> = {
   'duplicate-inflight': 'DUPLICATE · IN-FLIGHT',
