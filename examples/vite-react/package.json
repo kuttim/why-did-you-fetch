@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "why-did-you-fetch": "^0.4.0"
+    "why-did-you-fetch": "^0.7.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
