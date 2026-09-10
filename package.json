@@ -1,6 +1,6 @@
 {
   "name": "why-did-you-fetch",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Monkey-patches fetch/XHR to warn you in development about duplicate, redundant, and needlessly sequential network requests.",
   "keywords": [
     "fetch",

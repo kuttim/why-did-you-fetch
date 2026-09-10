@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.1] - 2026-09-10
+
+### Changed
+
+- Brand the output, use nested groups + console.table
+- Widen n-plus-one/rapid-calls windows for reliability
+
 ## [0.8.0] - 2026-09-10
 
 ### Added
