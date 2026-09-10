@@ -1,4 +1,4 @@
-import { init } from 'https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js';
+import { consoleReporter, init } from 'https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js';
 import type { Issue } from 'https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js';
 
 // nPlusOneWindowMs and rapidCallWindowMs are widened well past their real defaults (500ms/1000ms)
@@ -20,13 +20,6 @@ const LABEL: Record<Issue['kind'], string> = {
   'sequential-chain': 'SEQUENTIAL CHAIN',
   'rapid-calls': 'RAPID CALLS',
   'n-plus-one': 'N+1',
-};
-const BADGE_STYLE: Record<Issue['kind'], string> = {
-  'duplicate-inflight': 'background:#e11d48;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
-  'duplicate-recent': 'background:#d97706;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
-  'sequential-chain': 'background:#2563eb;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
-  'rapid-calls': 'background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
-  'n-plus-one': 'background:#059669;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',
 };
 const SEV_CLASS: Record<Issue['kind'], string> = {
   'duplicate-inflight': 'a',
@@ -363,9 +356,9 @@ function addIssueCard(issue: Issue): void {
   el.append(badge, msg);
   els.issues.prepend(el);
 
-  console.groupCollapsed('%c' + LABEL[issue.kind] + '%c ' + issue.message, BADGE_STYLE[issue.kind], '');
-  console.log(issue);
-  console.groupEnd();
+  // The real reporter, not a hand-rolled mirror of it — so the right panel is never at risk of
+  // drifting from what actually prints to your own console (see the README's caption for this).
+  consoleReporter(issue);
 }
 
 function renderFileTabs(files: FileSample[]): void {

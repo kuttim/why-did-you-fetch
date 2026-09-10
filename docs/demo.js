@@ -1,4 +1,4 @@
-import { init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js";
+import { consoleReporter, init } from "https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js";
 const DEMO_OPTIONS = {
   dedupeWindowMs: 1500,
   chainGapMs: 50,
@@ -13,13 +13,6 @@ const LABEL = {
   "sequential-chain": "SEQUENTIAL CHAIN",
   "rapid-calls": "RAPID CALLS",
   "n-plus-one": "N+1"
-};
-const BADGE_STYLE = {
-  "duplicate-inflight": "background:#e11d48;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold",
-  "duplicate-recent": "background:#d97706;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold",
-  "sequential-chain": "background:#2563eb;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold",
-  "rapid-calls": "background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold",
-  "n-plus-one": "background:#059669;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold"
 };
 const SEV_CLASS = {
   "duplicate-inflight": "a",
@@ -300,9 +293,7 @@ function addIssueCard(issue) {
   msg.textContent = issue.message;
   el.append(badge, msg);
   els.issues.prepend(el);
-  console.groupCollapsed("%c" + LABEL[issue.kind] + "%c " + issue.message, BADGE_STYLE[issue.kind], "");
-  console.log(issue);
-  console.groupEnd();
+  consoleReporter(issue);
 }
 function renderFileTabs(files) {
   els.fileTabs.innerHTML = "";
