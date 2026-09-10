@@ -11,10 +11,13 @@ can `cd` into and actually run.
 | [`vue`](./vue)                             | A real Vite + Vue 3 project (`<script setup>`, runes-adjacent composition), `init()` at the entry point.                                  |
 | [`angular`](./angular)                     | A real Angular project, standalone components — `HttpClient`'s default XHR backend is caught the same way as raw XHR.                     |
 | [`svelte`](./svelte)                       | A real Vite + Svelte 5 project (runes), `init()` at the entry point.                                                                      |
+| [`cypress-ci-check`](./cypress-ci-check)   | `collectIssues()` asserted from a real Cypress suite — how to fail a build on a duplicate-fetch regression, not just warn about it.       |
 
-Every example except `vanilla` depends on the real published `why-did-you-fetch` package (not the
-local source in `../src`), and CI builds all of them on every push — they're kept honest, not
-just written once and left to rot.
+Every example depends on the real published `why-did-you-fetch` package — most via npm, `vanilla`
+and `cypress-ci-check` via the same unversioned CDN import the live demo uses — never the local
+source in `../src`. CI builds all of them on every push except `cypress-ci-check`, which needs a
+release that actually includes `collectIssues()` before it can run there; until then it's still
+real and runnable, just not yet CI-verified.
 
 These frameworks were picked deliberately: bundler/framework interop is the single most common
 category of real-world integration issue for a library like this (patching a global that a

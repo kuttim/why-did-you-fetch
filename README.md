@@ -88,6 +88,24 @@ function App() {
 
 `react` is an optional peer dependency — only needed if you import this entry point.
 
+### Testing / CI
+
+`collectIssues()` is the same as `init()`, but gives you the detected issues as a plain array
+instead of (only) printing them, so a test can assert on it directly:
+
+```ts
+import { collectIssues } from 'why-did-you-fetch';
+
+const { issues, uninstall } = collectIssues();
+// ... exercise the page ...
+expect(issues).toHaveLength(0); // fail the build on a real regression, not just warn about it
+uninstall();
+```
+
+See [`examples/cypress-ci-check`](./examples/cypress-ci-check) for a full working example —
+including a test that proves the assertion actually catches a real duplicate-fetch regression,
+not just one that always passes.
+
 ## What it detects
 
 | Detector             | Fires when                                                                                                                                                                                                                                                                                     | Confidence                                                                                                                                                                                    |
@@ -228,9 +246,9 @@ See [`src/types.ts`](./src/types.ts) for the full `Issue` union and every option
 source at [`docs/demo.ts`](./docs/demo.ts) and [`docs/index.html`](./docs/index.html).
 
 Real, runnable integrations live in [`examples/`](./examples) — a zero-build vanilla page, Vite +
-React, Vue, Svelte, Angular, and a Next.js App Router project (the one place
-`useWhyDidYouFetch()`'s SSR-safety and effect-ordering behavior actually matters — see its README
-for why).
+React, Vue, Svelte, Angular, a Next.js App Router project (the one place `useWhyDidYouFetch()`'s
+SSR-safety and effect-ordering behavior actually matters — see its README for why), and a Cypress
+example showing `collectIssues()` failing a build on a real regression.
 
 ## Contributing
 

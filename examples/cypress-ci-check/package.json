@@ -1,0 +1,18 @@
+{
+  "name": "why-did-you-fetch-example-cypress-ci-check",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "serve": "serve -l 4173 .",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "test": "start-server-and-test serve http://localhost:4173 cy:run",
+    "build": "npm run test"
+  },
+  "devDependencies": {
+    "cypress": "^16.0.0",
+    "serve": "^14.2.6",
+    "start-server-and-test": "^3.0.12"
+  }
+}

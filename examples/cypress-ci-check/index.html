@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>why-did-you-fetch — Cypress CI-check example</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 560px;
+        margin: 3rem auto;
+        line-height: 1.6;
+      }
+      button {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+        margin-right: 0.5rem;
+      }
+      code {
+        background: #eee;
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+      }
+    </style>
+    <!-- Same zero-build import map approach as ../vanilla — see that example for why. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "why-did-you-fetch": "https://cdn.jsdelivr.net/npm/why-did-you-fetch/dist/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>why-did-you-fetch — Cypress CI-check example</h1>
+    <p>
+      This page exists to be tested, not read. See <code>cypress/e2e/network-hygiene.cy.js</code> for the actual point:
+      asserting on <code>collectIssues()</code>'s array from Cypress, so a duplicate-fetch regression fails the build
+      instead of just a console warning nobody was watching.
+    </p>
+    <button id="clean">Load profile (correct)</button>
+    <button id="buggy">Load profile (buggy)</button>
+    <p id="status"></p>
+
+    <script type="module">
+      import { collectIssues } from 'why-did-you-fetch';
+
+      // Exposed on window so Cypress's test code (running in the same browser, via cy.window())
+      // can read it directly — see the spec file.
+      window.__wdyf = collectIssues({ enabled: true });
+
+      document.getElementById('clean').addEventListener('click', () => {
+        // One call site, one request — nothing for any detector to flag.
+        fetch('https://jsonplaceholder.typicode.com/users/1');
+        document.getElementById('status').textContent = 'Loaded once — clean.';
+      });
+
+      document.getElementById('buggy').addEventListener('click', () => {
+        // Two call sites firing the exact same request before either has settled — the
+        // duplicate-inflight pattern, same as ../vanilla's demo.
+        fetch('https://jsonplaceholder.typicode.com/users/1');
+        fetch('https://jsonplaceholder.typicode.com/users/1');
+        document.getElementById('status').textContent = 'Loaded twice — buggy.';
+      });
+    </script>
+  </body>
+</html>
