@@ -1,4 +1,4 @@
-import type { Issue } from '../types.js';
+import type { Issue } from '../types';
 
 const BADGE_STYLE: Record<Issue['kind'], string> = {
   'duplicate-inflight': 'background:#e11d48;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold',

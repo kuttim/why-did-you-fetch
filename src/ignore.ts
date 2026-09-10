@@ -1,4 +1,4 @@
-import type { IgnoreMatcher } from './types.js';
+import type { IgnoreMatcher } from './types';
 
 export function shouldIgnore(url: string, method: string, matchers: IgnoreMatcher[]): boolean {
   return matchers.some((matcher) => {

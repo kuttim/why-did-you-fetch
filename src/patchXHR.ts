@@ -1,10 +1,10 @@
-import { shouldIgnore } from './ignore.js';
-import { buildSignature, hashBody } from './signature.js';
-import type { RequestTracker } from './tracker.js';
-import type { TrackedRequest } from './types.js';
-import type { ResolvedWdyfOptions } from './types.js';
-import { reportInternalError } from './utils/internalError.js';
-import { captureStack } from './utils/stack.js';
+import { shouldIgnore } from './ignore';
+import { buildSignature, hashBody } from './signature';
+import type { RequestTracker } from './tracker';
+import type { TrackedRequest } from './types';
+import type { ResolvedWdyfOptions } from './types';
+import { reportInternalError } from './utils/internalError';
+import { captureStack } from './utils/stack';
 
 type OpenFn = typeof XMLHttpRequest.prototype.open;
 type SendFn = typeof XMLHttpRequest.prototype.send;

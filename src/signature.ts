@@ -1,4 +1,4 @@
-import { fnv1a } from './utils/hash.js';
+import { fnv1a } from './utils/hash';
 
 /**
  * Best-effort, synchronous fingerprint of a request body. We deliberately avoid reading

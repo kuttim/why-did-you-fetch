@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { init } from './index.js';
-import type { WdyfOptions } from './index.js';
+import { init } from './index';
+import type { WdyfOptions } from './index';
 
 /**
  * Thin React convenience wrapper around `init()`. Call it once, near the root of your app —
@@ -38,4 +38,4 @@ export function useWhyDidYouFetch(options?: WdyfOptions): void {
   }, []);
 }
 
-export type { WdyfOptions } from './index.js';
+export type { WdyfOptions } from './index';

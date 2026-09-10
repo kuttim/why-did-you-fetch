@@ -1,6 +1,6 @@
-import { describeCacheFreshness } from './utils/cacheFreshness.js';
-import { stripQueryAndHash, templatePath } from './utils/path.js';
-import type { Issue, RequestKind, ResolvedWdyfOptions, TrackedRequest } from './types.js';
+import { describeCacheFreshness } from './utils/cacheFreshness';
+import { stripQueryAndHash, templatePath } from './utils/path';
+import type { Issue, RequestKind, ResolvedWdyfOptions, TrackedRequest } from './types';
 
 export interface StartParams {
   kind: RequestKind;
