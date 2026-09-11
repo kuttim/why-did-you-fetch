@@ -86,6 +86,20 @@ export type Issue =
 
 export type IgnoreMatcher = string | RegExp | ((url: string, method: string) => boolean);
 
+/** Raw (unnormalized) request info passed to a custom `buildKey`. */
+export interface BuildKeyRequest {
+  method: string;
+  url: string;
+  body: unknown;
+  /**
+   * Lower-cased header names. For fetch, combines a `Request` object's own headers with
+   * `init.headers` (the latter wins on conflict, matching real `fetch` behavior). For XHR,
+   * only headers set via `setRequestHeader` — not ones the browser adds automatically, like
+   * `Content-Length`.
+   */
+  headers: Record<string, string>;
+}
+
 export interface WdyfOptions {
   /**
    * Turn the whole thing on/off. Defaults to `true` unless `process.env.NODE_ENV === 'production'`
@@ -162,6 +176,15 @@ export interface WdyfOptions {
    * request. Does not affect the actual request body sent. Default: identity (no change).
    */
   normalizeBody?: (body: unknown) => unknown;
+  /**
+   * Fully overrides how the duplicate-matching key is computed, given the raw method, URL,
+   * body, and headers of a request — e.g. to fold an auth token or tenant header into the
+   * signature, or to ignore a header-only difference the default method+URL+body signature
+   * would otherwise treat as a different request. When provided, this replaces the default
+   * signature entirely — `normalizeUrl`/`normalizeBody` are not applied unless you apply them
+   * yourself inside `buildKey`. Default: undefined (use the built-in method+url+body signature).
+   */
+  buildKey?: (req: BuildKeyRequest) => string;
 }
 
-export type ResolvedWdyfOptions = Required<WdyfOptions>;
+export type ResolvedWdyfOptions = Required<Omit<WdyfOptions, 'buildKey'>> & Pick<WdyfOptions, 'buildKey'>;

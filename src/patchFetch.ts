@@ -3,6 +3,7 @@ import { buildSignature, hashBody } from './signature';
 import type { RequestTracker } from './tracker';
 import type { TrackedRequest } from './types';
 import type { ResolvedWdyfOptions } from './types';
+import { headersToRecord, type HeadersLike } from './utils/headers';
 import { reportInternalError } from './utils/internalError';
 import { captureStack } from './utils/stack';
 
@@ -24,6 +25,18 @@ function extractMethodAndUrl(input: RequestInfo | URL, init?: RequestInit): { me
 function extractBody(input: RequestInfo | URL, init?: RequestInit): unknown {
   if (init && 'body' in init) return init.body;
   return undefined;
+}
+
+/** Combines a `Request` object's own headers with `init.headers` (init wins on conflict, matching real `fetch`). */
+function extractHeaders(input: RequestInfo | URL, init?: RequestInit): Record<string, string> {
+  let record: Record<string, string> = {};
+  if (typeof input === 'object' && !(input instanceof URL) && 'headers' in input) {
+    record = headersToRecord((input as Request).headers);
+  }
+  if (init?.headers) {
+    record = { ...record, ...headersToRecord(init.headers as HeadersLike) };
+  }
+  return record;
 }
 
 /** `init.keepalive` takes precedence; falls back to a `Request` object's own flag. */
@@ -54,8 +67,10 @@ export function patchFetch(
       const { method, url } = extractMethodAndUrl(input, init);
       if (!(shouldIgnore(url, method, options.ignore) || (options.ignoreKeepalive && isKeepalive(input, init)))) {
         const stack = captureStack();
-        const bodyHash = hashBody(options.normalizeBody(extractBody(input, init)));
-        const signature = buildSignature(method, options.normalizeUrl(url), bodyHash);
+        const body = extractBody(input, init);
+        const signature = options.buildKey
+          ? options.buildKey({ method, url, body, headers: extractHeaders(input, init) })
+          : buildSignature(method, options.normalizeUrl(url), hashBody(options.normalizeBody(body)));
         tracked = tracker.start({ kind: 'fetch', method, url, signature, stack });
       }
     } catch (error) {

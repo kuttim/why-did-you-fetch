@@ -8,11 +8,14 @@ import { captureStack } from './utils/stack';
 
 type OpenFn = typeof XMLHttpRequest.prototype.open;
 type SendFn = typeof XMLHttpRequest.prototype.send;
+type SetRequestHeaderFn = typeof XMLHttpRequest.prototype.setRequestHeader;
 
 interface OpenState {
   method: string;
   url: string;
   stack: () => string;
+  /** Headers set via `setRequestHeader` since the matching `open()` call, lower-cased keys. */
+  headers: Record<string, string>;
 }
 
 /**
@@ -28,6 +31,7 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
 
   const originalOpen: OpenFn = XHR.prototype.open;
   const originalSend: SendFn = XHR.prototype.send;
+  const originalSetRequestHeader: SetRequestHeaderFn = XHR.prototype.setRequestHeader;
 
   XHR.prototype.open = function patchedOpen(
     this: XMLHttpRequest,
@@ -38,20 +42,31 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
     // A bug here (ours, or in a user callback) must never take the real open() call down with
     // it — see the matching comment in patchFetch.
     try {
-      openState.set(this, { method: method.toUpperCase(), url: url.toString(), stack: captureStack() });
+      openState.set(this, { method: method.toUpperCase(), url: url.toString(), stack: captureStack(), headers: {} });
     } catch (error) {
       reportInternalError('patchXHR (open)', error);
     }
     return (originalOpen as (...args: unknown[]) => void).apply(this, [method, url, ...rest]);
   } as OpenFn;
 
+  XHR.prototype.setRequestHeader = function patchedSetRequestHeader(this: XMLHttpRequest, name: string, value: string) {
+    try {
+      const state = openState.get(this);
+      if (state) state.headers[name.toLowerCase()] = value;
+    } catch (error) {
+      reportInternalError('patchXHR (setRequestHeader)', error);
+    }
+    return originalSetRequestHeader.call(this, name, value);
+  } as SetRequestHeaderFn;
+
   XHR.prototype.send = function patchedSend(this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
     let tracked: TrackedRequest | null = null;
     try {
       const state = openState.get(this);
       if (state && !shouldIgnore(state.url, state.method, options.ignore)) {
-        const bodyHash = hashBody(options.normalizeBody(body));
-        const signature = buildSignature(state.method, options.normalizeUrl(state.url), bodyHash);
+        const signature = options.buildKey
+          ? options.buildKey({ method: state.method, url: state.url, body, headers: state.headers })
+          : buildSignature(state.method, options.normalizeUrl(state.url), hashBody(options.normalizeBody(body)));
         tracked = tracker.start({
           kind: 'xhr',
           method: state.method,
@@ -96,5 +111,6 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
   return () => {
     XHR.prototype.open = originalOpen;
     XHR.prototype.send = originalSend;
+    XHR.prototype.setRequestHeader = originalSetRequestHeader;
   };
 }

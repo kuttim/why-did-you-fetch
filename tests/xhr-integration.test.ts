@@ -11,6 +11,7 @@ class FakeXHR extends EventTarget {
     this.method = method;
     this.url = url;
   }
+  setRequestHeader(_name: string, _value: string): void {}
   send(_body?: unknown): void {
     queueMicrotask(() => this.dispatchEvent(new Event('loadend')));
   }
@@ -133,6 +134,37 @@ describe('init() with XMLHttpRequest', () => {
     const b = new target.XMLHttpRequest() as unknown as FakeXHR;
     (b as unknown as XMLHttpRequest).open('GET', '/a');
     (b as unknown as XMLHttpRequest).send();
+
+    expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
+    uninstall();
+  });
+
+  it('does not flag requests to the same URL as duplicates when a buildKey folds in a differing header', async () => {
+    const issues: Issue[] = [];
+    const target = fakeTarget();
+    const uninstall = init(
+      {
+        enabled: true,
+        patch: ['xhr'],
+        onIssue: (i) => issues.push(i),
+        buildKey: ({ method, url, headers }) => `${method} ${url} ${headers['x-tenant-id'] ?? ''}`,
+      },
+      target,
+    );
+
+    const a = new target.XMLHttpRequest() as unknown as FakeXHR;
+    const b = new target.XMLHttpRequest() as unknown as FakeXHR;
+    const rawA = a as unknown as XMLHttpRequest;
+    const rawB = b as unknown as XMLHttpRequest;
+
+    rawA.open('GET', '/users/1');
+    rawA.setRequestHeader('X-Tenant-Id', 'a');
+    rawB.open('GET', '/users/1');
+    rawB.setRequestHeader('X-Tenant-Id', 'b');
+    const settled = Promise.all([settle(a), settle(b)]);
+    rawA.send();
+    rawB.send();
+    await settled;
 
     expect(issues.filter((i) => i.kind === 'duplicate-inflight')).toHaveLength(0);
     uninstall();

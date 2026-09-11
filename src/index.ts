@@ -5,6 +5,7 @@ import { RequestTracker } from './tracker';
 import type { Issue, ResolvedWdyfOptions, WdyfOptions } from './types';
 
 export type {
+  BuildKeyRequest,
   DuplicateInflightIssue,
   DuplicateRecentIssue,
   Issue,
@@ -46,6 +47,7 @@ function resolveOptions(options: WdyfOptions): ResolvedWdyfOptions {
     nPlusOneMinCount: options.nPlusOneMinCount ?? 5,
     ignoreKeepalive: options.ignoreKeepalive ?? true,
     normalizeBody: options.normalizeBody ?? ((body: unknown) => body),
+    buildKey: options.buildKey,
   };
 }
 

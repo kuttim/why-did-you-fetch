@@ -239,6 +239,48 @@ describe('init() with fetch', () => {
     uninstall();
   });
 
+  it('does not flag requests to the same URL as duplicates when a buildKey folds in a differing header', async () => {
+    const issues: Issue[] = [];
+    let resolveResponse: (r: Response) => void;
+    const pending = new Promise<Response>((resolve) => (resolveResponse = resolve));
+    const target = fakeTarget(() => pending);
+
+    const uninstall = init(
+      {
+        enabled: true,
+        onIssue: (i) => issues.push(i),
+        buildKey: ({ method, url, headers }) => `${method} ${url} ${headers['x-tenant-id'] ?? ''}`,
+      },
+      target,
+    );
+
+    const p1 = target.fetch('/users/1', { headers: { 'X-Tenant-Id': 'a' } });
+    const p2 = target.fetch('/users/1', { headers: { 'X-Tenant-Id': 'b' } });
+    resolveResponse!(new Response('ok'));
+    await Promise.all([p1, p2]);
+
+    expect(issues).toHaveLength(0);
+    uninstall();
+  });
+
+  it('flags requests with the same buildKey as duplicates even though the URL differs', async () => {
+    const issues: Issue[] = [];
+    let resolveResponse: (r: Response) => void;
+    const pending = new Promise<Response>((resolve) => (resolveResponse = resolve));
+    const target = fakeTarget(() => pending);
+
+    const uninstall = init({ enabled: true, onIssue: (i) => issues.push(i), buildKey: () => 'same-key' }, target);
+
+    const p1 = target.fetch('/users/1');
+    const p2 = target.fetch('/users/2');
+    resolveResponse!(new Response('ok'));
+    await Promise.all([p1, p2]);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.kind).toBe('duplicate-inflight');
+    uninstall();
+  });
+
   it('still resolves the real call when onIssue throws while settling', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const target = fakeTarget(() => Promise.resolve(new Response('ok')));
