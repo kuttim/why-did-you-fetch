@@ -68,7 +68,11 @@ export function patchFetch(
       result.then(
         (res) => {
           try {
-            tracker.settle(request, res.ok ? 'resolved' : 'rejected', res.headers.get('cache-control'));
+            // An opaque response (mode: 'no-cors' to a cross-origin URL) always reports
+            // status 0 / ok: false per spec, regardless of whether the request actually
+            // succeeded — that's not a real rejection signal, so treat it as resolved.
+            const isOpaque = res.type === 'opaque' || res.type === 'opaqueredirect';
+            tracker.settle(request, res.ok || isOpaque ? 'resolved' : 'rejected', res.headers.get('cache-control'));
           } catch (error) {
             reportInternalError('patchFetch (settle)', error);
           }
