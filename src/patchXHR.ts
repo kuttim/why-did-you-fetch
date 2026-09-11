@@ -23,7 +23,11 @@ interface OpenState {
  * Covers libraries (older axios configs, analytics SDKs, etc.) that use XHR directly instead
  * of `fetch`. Returns an `uninstall` function that restores both originals.
  */
-export function patchXHR(target: typeof globalThis, tracker: RequestTracker, options: ResolvedWdyfOptions): () => void {
+export function patchXHR(
+  target: typeof globalThis,
+  resolveTracker: () => RequestTracker,
+  options: ResolvedWdyfOptions,
+): () => void {
   const XHR = target.XMLHttpRequest;
   if (!XHR) return () => {};
 
@@ -60,27 +64,30 @@ export function patchXHR(target: typeof globalThis, tracker: RequestTracker, opt
   } as SetRequestHeaderFn;
 
   XHR.prototype.send = function patchedSend(this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
-    let tracked: TrackedRequest | null = null;
+    let tracked: { tracker: RequestTracker; request: TrackedRequest } | null = null;
     try {
       const state = openState.get(this);
       if (state && !shouldIgnore(state.url, state.method, options.ignore)) {
         const signature = options.buildKey
           ? options.buildKey({ method: state.method, url: state.url, body, headers: state.headers })
           : buildSignature(state.method, options.normalizeUrl(state.url), hashBody(options.normalizeBody(body)));
-        tracked = tracker.start({
+        // Resolved once per call, up front — see the matching comment in patchFetch.ts.
+        const tracker = resolveTracker();
+        const request = tracker.start({
           kind: 'xhr',
           method: state.method,
           url: state.url,
           signature,
           stack: state.stack,
         });
+        tracked = { tracker, request };
       }
     } catch (error) {
       reportInternalError('patchXHR (send)', error);
     }
 
     if (tracked) {
-      const request = tracked;
+      const { tracker, request } = tracked;
       // `request` is captured directly in this closure rather than looked up from a map keyed
       // by `this` — an XHR instance can be reused (open()+send() again before the prior
       // request's loadend fires, e.g. cancel-and-restart on user input), and a shared per-instance

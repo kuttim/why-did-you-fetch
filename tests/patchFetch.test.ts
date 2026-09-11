@@ -52,7 +52,7 @@ describe('patchFetch', () => {
     } as unknown as RequestTracker;
 
     const target = { fetch: vi.fn(() => Promise.resolve(new Response('ok'))) } as unknown as typeof globalThis;
-    patchFetch(target, tracker, OPTIONS);
+    patchFetch(target, () => tracker, OPTIONS);
 
     const res = await target.fetch('/a');
 
@@ -71,7 +71,7 @@ describe('patchFetch', () => {
     } as unknown as RequestTracker;
 
     const target = { fetch: vi.fn(() => Promise.reject(new Error('network down'))) } as unknown as typeof globalThis;
-    patchFetch(target, tracker, OPTIONS);
+    patchFetch(target, () => tracker, OPTIONS);
 
     await expect(target.fetch('/a')).rejects.toThrow('network down');
     // let the settle-rejection handler's microtask run
@@ -85,7 +85,7 @@ describe('patchFetch', () => {
     const target = {
       fetch: vi.fn(() => Promise.resolve(new Response('nope', { status: 500 }))),
     } as unknown as typeof globalThis;
-    patchFetch(target, tracker, OPTIONS);
+    patchFetch(target, () => tracker, OPTIONS);
 
     await target.fetch('/a');
 
@@ -101,7 +101,7 @@ describe('patchFetch', () => {
       headers: { get: () => null },
     } as unknown as Response;
     const target = { fetch: vi.fn(() => Promise.resolve(opaqueResponse)) } as unknown as typeof globalThis;
-    patchFetch(target, tracker, OPTIONS);
+    patchFetch(target, () => tracker, OPTIONS);
 
     await target.fetch('/a');
 
@@ -117,7 +117,7 @@ describe('patchFetch', () => {
       headers: { get: () => null },
     } as unknown as Response;
     const target = { fetch: vi.fn(() => Promise.resolve(opaqueRedirectResponse)) } as unknown as typeof globalThis;
-    patchFetch(target, tracker, OPTIONS);
+    patchFetch(target, () => tracker, OPTIONS);
 
     await target.fetch('/a');
 
