@@ -1,8 +1,9 @@
 import { consoleReporter } from './reporter/console';
 import { patchFetch } from './patchFetch';
 import { patchXHR } from './patchXHR';
+import { getScopedTracker, whenRequestScopeReady, withRequestScope } from './requestScope';
 import { RequestTracker } from './tracker';
-import type { Issue, ResolvedWdyfOptions, WdyfOptions } from './types';
+import type { Issue, ResolvedWdyfOptions, WdyfHandle, WdyfOptions } from './types';
 
 export type {
   BuildKeyRequest,
@@ -16,6 +17,7 @@ export type {
   RequestStatus,
   SequentialChainIssue,
   TrackedRequest,
+  WdyfHandle,
   WdyfOptions,
 } from './types';
 export { consoleReporter } from './reporter/console';
@@ -54,6 +56,14 @@ function resolveOptions(options: WdyfOptions): ResolvedWdyfOptions {
 /** No-op uninstall, returned when init() doesn't patch anything (disabled, or no global to patch). */
 const NOOP = (): void => {};
 
+/** withRequestScope/ready for the disabled/no-op case: scoping isn't meaningful when nothing is tracked. */
+function noopHandle(): WdyfHandle {
+  return Object.assign(NOOP, {
+    withRequestScope: <T>(fn: () => T): T => fn(),
+    ready: Promise.resolve(),
+  });
+}
+
 /**
  * Patches `fetch`/`XMLHttpRequest` on `target` (defaults to `globalThis`) to detect and report
  * duplicate and needlessly-sequential network requests. Call it once, as early as possible —
@@ -64,21 +74,34 @@ const NOOP = (): void => {};
  * init(); // no-ops automatically when NODE_ENV === 'production'
  * ```
  *
- * Returns an `uninstall` function that restores the original `fetch`/`XMLHttpRequest`.
+ * Calling the returned handle restores the original `fetch`/`XMLHttpRequest`. On Node/SSR, wrap
+ * each incoming request with the handle's `withRequestScope` so concurrent requests from
+ * different users are never compared against each other — see the Node/SSR section in the README.
  */
-export function init(options: WdyfOptions = {}, target: typeof globalThis = globalThis): () => void {
+export function init(options: WdyfOptions = {}, target: typeof globalThis = globalThis): WdyfHandle {
   const resolved = resolveOptions(options);
-  if (!resolved.enabled) return NOOP;
+  if (!resolved.enabled) return noopHandle();
 
-  const tracker = new RequestTracker(resolved, (issue: Issue) => resolved.onIssue(issue));
+  const emit = (issue: Issue): void => resolved.onIssue(issue);
+  const createTracker = (): RequestTracker => new RequestTracker(resolved, emit);
+  const tracker = createTracker();
+  // The active tracker for any given call: the current request scope's if init() is running
+  // under Node/SSR request scoping (withRequestScope), else the single shared instance above —
+  // same as before this existed.
+  const resolveTracker = (): RequestTracker => getScopedTracker() ?? tracker;
 
   const uninstallers: Array<() => void> = [];
-  if (resolved.patch.includes('fetch')) uninstallers.push(patchFetch(target, tracker, resolved));
-  if (resolved.patch.includes('xhr')) uninstallers.push(patchXHR(target, tracker, resolved));
+  if (resolved.patch.includes('fetch')) uninstallers.push(patchFetch(target, resolveTracker, resolved));
+  if (resolved.patch.includes('xhr')) uninstallers.push(patchXHR(target, resolveTracker, resolved));
 
-  return () => {
-    for (const uninstall of uninstallers) uninstall();
+  const uninstall = (): void => {
+    for (const fn of uninstallers) fn();
   };
+
+  return Object.assign(uninstall, {
+    withRequestScope: <T>(fn: () => T): T => withRequestScope(createTracker, fn),
+    ready: whenRequestScopeReady(),
+  });
 }
 
 export interface IssueCollector {

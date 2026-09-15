@@ -188,3 +188,26 @@ export interface WdyfOptions {
 }
 
 export type ResolvedWdyfOptions = Required<Omit<WdyfOptions, 'buildKey'>> & Pick<WdyfOptions, 'buildKey'>;
+
+/**
+ * What `init()` returns: calling it directly restores the original `fetch`/`XMLHttpRequest`
+ * (same as before); `withRequestScope` additionally lets Node/SSR code isolate concurrent
+ * requests from each other (see the Node/SSR section in the README).
+ */
+export interface WdyfHandle {
+  (): void;
+  /**
+   * Runs `fn` with its own isolated request tracker, so fetch/XHR calls made anywhere inside it
+   * — however deep, across awaits and callbacks — are only ever compared against each other, not
+   * against a concurrent, unrelated invocation. Wrap each incoming request with this on a Node
+   * server to make duplicate/chain/etc. detection safe under concurrent load; a no-op pass-through
+   * everywhere else (browsers, or any runtime without `AsyncLocalStorage`).
+   */
+  withRequestScope<T>(fn: () => T): T;
+  /**
+   * Resolves once Node/SSR request scoping has finished loading (or failed to, wherever it isn't
+   * available). Not required for normal use — `withRequestScope` works standalone — but awaiting
+   * it first guarantees isolation from the very first call, useful in tests or right after startup.
+   */
+  ready: Promise<void>;
+}

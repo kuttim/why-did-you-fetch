@@ -152,6 +152,33 @@ A couple of specifics worth calling out:
 - **Service Workers get `fetch` but not `XMLHttpRequest`** — it's excluded from
   `ServiceWorkerGlobalScope` by spec, unlike regular (dedicated) Web Workers, which do have it.
 
+### Node.js / SSR: isolating concurrent requests
+
+`init()` tracks requests with one shared instance for its whole lifetime. That's fine for a
+browser tab (one user, one page), but on a Node server handling concurrent requests from
+different users, two unrelated requests hitting the same-shaped endpoint at the same moment would
+otherwise be wrongly flagged as duplicates of each other.
+
+Wrap each incoming request with the handle's `withRequestScope` to fix that — every fetch call
+made anywhere inside it (however deep, across `await`s and callbacks) is then compared only
+against other calls from that same request, never a concurrent one:
+
+```ts
+import { init } from 'why-did-you-fetch';
+
+const wdyf = init();
+
+// e.g. Express middleware
+app.use((req, res, next) => {
+  wdyf.withRequestScope(() => next());
+});
+```
+
+This uses Node's `AsyncLocalStorage` under the hood and is a no-op pass-through anywhere it isn't
+available (browsers, workers) — nothing to gate behind an environment check. If you need isolation
+guaranteed from the very first request (useful in tests, or right after a cold start), await
+`wdyf.ready` once before serving traffic.
+
 ## Configuration
 
 ```ts

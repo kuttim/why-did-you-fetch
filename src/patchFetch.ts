@@ -52,7 +52,7 @@ function isKeepalive(input: RequestInfo | URL, init?: RequestInit): boolean {
  */
 export function patchFetch(
   target: typeof globalThis,
-  tracker: RequestTracker,
+  resolveTracker: () => RequestTracker,
   options: ResolvedWdyfOptions,
 ): () => void {
   const original = target.fetch as FetchFn | undefined;
@@ -62,7 +62,7 @@ export function patchFetch(
     // A bug here (ours, or in a user-supplied ignore/normalizeUrl/normalizeBody callback) must
     // never take the real fetch call down with it — instrumentation is best-effort, wrapped
     // separately from the real call below, which always happens regardless.
-    let tracked: TrackedRequest | null = null;
+    let tracked: { tracker: RequestTracker; request: TrackedRequest } | null = null;
     try {
       const { method, url } = extractMethodAndUrl(input, init);
       if (!(shouldIgnore(url, method, options.ignore) || (options.ignoreKeepalive && isKeepalive(input, init)))) {
@@ -71,7 +71,13 @@ export function patchFetch(
         const signature = options.buildKey
           ? options.buildKey({ method, url, body, headers: extractHeaders(input, init) })
           : buildSignature(method, options.normalizeUrl(url), hashBody(options.normalizeBody(body)));
-        tracked = tracker.start({ kind: 'fetch', method, url, signature, stack });
+        // Resolved once per call, up front — the current request scope's tracker if init() is
+        // running under Node/SSR request scoping (see requestScope.ts), else the single shared
+        // one. Kept alongside `request` rather than re-resolved at settle time, so a call is
+        // always matched against the same tracker it started in even if the scope has since exited.
+        const tracker = resolveTracker();
+        const request = tracker.start({ kind: 'fetch', method, url, signature, stack });
+        tracked = { tracker, request };
       }
     } catch (error) {
       reportInternalError('patchFetch', error);
@@ -79,7 +85,7 @@ export function patchFetch(
 
     const result = original.call(target, input, init);
     if (tracked) {
-      const request = tracked;
+      const { tracker, request } = tracked;
       result.then(
         (res) => {
           try {

@@ -58,7 +58,7 @@ describe('patchXHR', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const tracker = { start: vi.fn(), settle: vi.fn() } as unknown as RequestTracker;
     const target = { XMLHttpRequest: FakeXHR } as unknown as typeof globalThis;
-    patchXHR(target, tracker, OPTIONS);
+    patchXHR(target, () => tracker, OPTIONS);
 
     const xhr = new FakeXHR() as unknown as XMLHttpRequest;
     const badUrl = { toString: () => throwing() } as unknown as URL;
@@ -80,7 +80,7 @@ describe('patchXHR', () => {
       }),
     } as unknown as RequestTracker;
     const target = { XMLHttpRequest: FakeXHR } as unknown as typeof globalThis;
-    patchXHR(target, tracker, OPTIONS);
+    patchXHR(target, () => tracker, OPTIONS);
 
     const xhr = new FakeXHR();
     const raw = xhr as unknown as XMLHttpRequest;
