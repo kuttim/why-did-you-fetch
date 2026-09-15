@@ -7,6 +7,4 @@ coverage/
 .next/
 next-env.d.ts
 *.tsbuildinfo
-AGENTS.md
-CLAUDE.md
-SKILL.md
+.claude
